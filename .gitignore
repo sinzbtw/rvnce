@@ -4,6 +4,9 @@ dist/
 coverage/
 playwright-report/
 test-results/
+/graphify-out/
+/.agents/skills/graphify/
+/.codex/hooks.json
 .env
 .env.*
 !.env.example

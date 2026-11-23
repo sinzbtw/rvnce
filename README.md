@@ -64,6 +64,8 @@ Use **Export JSON** for a portable copy. Here is a minimal example you can impor
 
 Rvnce uses Preact, TypeScript, and Vite. The public renderer takes validated profile data and assets. The editor preview, sample profile, and exporter use that renderer. Vitest covers profile validation and export logic. Playwright tests the production editor and exported profiles.
 
+See [Architecture](ARCHITECTURE.md) for the component diagram and instructions for generating a local interactive code graph with Graphify.
+
 See [Contributing](CONTRIBUTING.md) for local checks and reviews, [Roadmap](ROADMAP.md) for planned work, and [Security](SECURITY.md) for the trust model and private reporting.
 
 ## License
