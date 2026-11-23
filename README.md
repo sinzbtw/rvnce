@@ -8,15 +8,15 @@ Rvnce is an open-source editor for personal bio pages. Build a profile in your b
 
 ## What you can do
 
-- Edit a display name, bio, and photo. Upload a PNG, JPEG, or WebP image up to 4 MB.
+- Edit a display name, bio, photo, and page language. Upload a PNG, JPEG, or WebP image up to 4 MiB, 24 megapixels, and 8192 pixels per side.
 - Add, edit, remove, and reorder up to 24 links.
 - Choose a light or dark profile and set an accent color.
-- Preview at wide and phone widths. Edits are saved locally when browser storage is available.
-- Import or export a versioned JSON profile, including its photo, or download a ready-to-host ZIP.
+- Preview at wide and phone widths. Preview links are static. Published links open their destinations.
+- Import or export a versioned JSON draft, including incomplete fields and the photo, or download a ready-to-host ZIP once the profile is complete.
 
-If browser storage is unavailable, changes may be lost when you refresh or close the page. Export a JSON copy to keep editing later.
+Rvnce saves one draft per browser origin. If the draft changes in another tab, the editor keeps your current edits on screen. Download a JSON copy before loading the saved version. If storage is unavailable, export a JSON copy before refreshing or closing the page.
 
-The sample profile, Mira Park, is fictional. Its avatar was supplied for the demo. Its links point to public design and software resources.
+The sample profile, Mira Park, is fictional. Its portrait was supplied for the demo. The photographer and redistribution terms have yet to be confirmed. The sample links point to public design and software resources.
 
 ## Run locally
 
@@ -36,7 +36,7 @@ Serve the contents of `dist/` at the root or under a subpath to host the editor 
 
 ## Publish a profile
 
-1. In the editor, choose **Download site**.
+1. Fill in the display name, enter a page language tag such as `en`, and complete each link with a label and a full HTTP(S) URL. Choose **Download site**. The ZIP contains a re-encoded PNG, which strips metadata from the source photo.
 2. Extract the ZIP and upload its contents to your static host. Keep `index.html`, `profile.css`, the `fonts/` directory, the photo if present, and `.nojekyll` together.
 3. Open the URL for that directory.
 
@@ -44,11 +44,11 @@ For GitHub Pages, put the extracted files at the root of the repository you use 
 
 ## Profile JSON
 
-Use **Export JSON** for a portable copy. Here is a minimal example you can import:
+**Export JSON** downloads a portable draft. **Import JSON** accepts v2 drafts and upgrades v1 profiles with `en`, the language used by earlier exports. Change the page language before publishing if the profile uses another language. A minimal example to import:
 
     {
-      "schemaVersion": 1,
-      "profile": { "name": "Mira Park", "bio": "Independent poster designer.", "avatar": null },
+      "schemaVersion": 2,
+      "profile": { "name": "Mira Park", "bio": "Independent poster designer.", "avatar": null, "language": "en" },
       "appearance": { "theme": "rvnce", "variant": "light", "accent": "#4434d4" },
       "blocks": [
         {

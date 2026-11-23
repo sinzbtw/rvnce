@@ -1,5 +1,9 @@
 import { renderToString } from 'preact-render-to-string'
-import { avatarBytes, type ProfileDocument } from '../profile/document'
+import {
+  avatarBytes,
+  profileLanguage,
+  type ProfileDocument,
+} from '../profile/document'
 import { accentInk } from '../public/colors'
 import { PublicProfile } from '../public/PublicProfile'
 
@@ -22,6 +26,7 @@ interface SiteAssets {
   latinFont: Uint8Array
   cyrillicFont: Uint8Array
   fontLicense: Uint8Array
+  avatar?: Uint8Array | undefined
 }
 
 export function siteFiles(
@@ -29,9 +34,10 @@ export function siteFiles(
   assets: SiteAssets,
 ): Record<string, string | Uint8Array> {
   const { accent } = doc.appearance
-  const avatar = doc.profile.avatar && avatarBytes(doc.profile.avatar)
+  const avatar =
+    assets.avatar ?? (doc.profile.avatar && avatarBytes(doc.profile.avatar))
   const html = renderToString(
-    <html lang="en">
+    <html lang={profileLanguage(doc.profile.language) ?? 'en'}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -45,7 +51,7 @@ export function siteFiles(
         <link rel="stylesheet" href="./profile.css" />
       </head>
       <body class="published-page" data-variant={doc.appearance.variant}>
-        <main class="published-content">
+        <main class="published-content profile-viewport">
           <PublicProfile doc={doc} avatarUrl={avatar ? './avatar.png' : null} />
         </main>
       </body>
@@ -53,8 +59,6 @@ export function siteFiles(
   )
   const css = [
     fontRules('./fonts/manrope-latin.woff2', './fonts/manrope-cyrillic.woff2'),
-    '.published-page{margin:0;background:#eae5fc}.published-page[data-variant="dark"]{background:#221c35}',
-    '.published-content{max-width:640px;margin:0 auto;padding-block:clamp(18px,9vh,100px)}',
     '.public-profile{--accent:' +
       accent +
       ';--accent-ink:' +

@@ -1,27 +1,43 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import {
   defaultAccent,
+  editableText,
   limits,
   parseProfile,
   profileIssues,
+  profileLanguage,
   type LinkBlock,
   type ProfileDocument,
 } from '../profile/document'
 import { accentInk } from '../public/colors'
 import { PublicProfile } from '../public/PublicProfile'
 import { Icon } from './Icon'
-import { download, importProfile, normalizeAvatar, pngDataUrl } from './files'
-import { saveDraft, type DraftStatus } from './storage'
+import {
+  download,
+  encodeAvatar,
+  importProfile,
+  normalizeAvatar,
+  pngDataUrl,
+} from './files'
+import type { StoredDraft } from './storage'
+import { useDraft } from './useDraft'
 
 const sections = ['Profile', 'Links', 'Appearance'] as const
 type Section = (typeof sections)[number]
 
-const saveMessages: Record<DraftStatus, string> = {
+const saveMessages = {
   ready: 'Edits save here',
+  pending: 'Saving…',
   saved: 'Saved locally',
   unavailable:
-    'Browser storage is unavailable. Changes may be lost if you refresh or close this page. Download your profile to keep a copy.',
-  invalid: 'The saved draft could not be loaded. The sample profile is open.',
+    'Browser storage is unavailable. Changes may be lost if you refresh or close this page. Export JSON to keep a copy.',
+  invalid:
+    'The saved draft could not be loaded. Download the original or replace it with this profile.',
+  recovered:
+    'The saved draft was recovered. Unsupported control characters were removed or replaced.',
+  conflict:
+    'The saved draft changed in another tab. Export JSON to keep your edits here before loading the saved version.',
+  'invalid-edit': 'This draft could not be saved. Check the edited fields.',
 }
 
 const colors = [
@@ -39,16 +55,37 @@ function message(error: unknown): string {
     : 'Something went wrong. Try again.'
 }
 
+function fieldValue(
+  input: HTMLInputElement | HTMLTextAreaElement,
+  multiline = false,
+): string {
+  const value = editableText(input.value, multiline)
+  if (value !== input.value) {
+    const start = input.selectionStart
+    const end = input.selectionEnd
+    const previous = input.value
+    input.value = value
+    if (start !== null && end !== null) {
+      input.setSelectionRange(
+        editableText(previous.slice(0, start), multiline).length,
+        editableText(previous.slice(0, end), multiline).length,
+      )
+    }
+  }
+  return value
+}
+
 export function Editor({
-  initialDoc,
-  initialStatus,
+  initialDraft,
+  sample,
+  sampleAvatarUrl,
 }: {
-  initialDoc: ProfileDocument
-  initialStatus: DraftStatus
+  initialDraft: StoredDraft
+  sample: ProfileDocument
+  sampleAvatarUrl: string
 }) {
-  const [doc, setDoc] = useState(initialDoc)
-  const latest = useRef(doc)
-  const [status, setStatus] = useState(initialStatus)
+  const draft = useDraft(initialDraft, sample)
+  const { doc, latest, status, otherDraft } = draft
   const [section, setSection] = useState<Section>('Profile')
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [device, setDevice] = useState<'wide' | 'phone'>('wide')
@@ -64,6 +101,7 @@ export function Editor({
   const dialog = useRef<HTMLDialogElement>(null)
   const addFocus = useRef<string | null>(null)
   const avatarOperation = useRef(0)
+  const importOperation = useRef(0)
 
   const issues = profileIssues(doc)
   const avatar = doc.profile.avatar ? pngDataUrl(doc.profile.avatar) : null
@@ -78,6 +116,25 @@ export function Editor({
     '--accent': doc.appearance.accent,
     '--accent-ink': accentInk(doc.appearance.accent),
   }
+  const quietStatus =
+    status === 'ready' || status === 'pending' || status === 'saved'
+
+  useEffect(() => {
+    if (initialDraft.doc) return
+    const controller = new AbortController()
+    void fetch(sampleAvatarUrl, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return
+        const encoded = await encodeAvatar(await response.blob())
+        if (!controller.signal.aborted && avatarOperation.current === 0) {
+          draft.useSampleAvatar(encoded)
+        }
+      })
+      .catch(() => {
+        // The sample can be edited and published with initials.
+      })
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     if (pendingImport && !dialog.current?.open) dialog.current?.showModal()
@@ -91,10 +148,7 @@ export function Editor({
   }, [doc.blocks.length, section])
 
   function update(edit: (current: ProfileDocument) => ProfileDocument) {
-    const next = edit(latest.current)
-    latest.current = next
-    setDoc(next)
-    setStatus(saveDraft(next))
+    draft.update(edit)
     setNotice('')
   }
 
@@ -117,10 +171,14 @@ export function Editor({
     }
   }
 
-  function removeAvatar() {
+  function clearAvatarOperation() {
     avatarOperation.current++
     setAvatarLoading(false)
     setAvatarError('')
+  }
+
+  function removeAvatar() {
+    clearAvatarOperation()
     update((current) => ({
       ...current,
       profile: { ...current.profile, avatar: null },
@@ -158,6 +216,12 @@ export function Editor({
       if (!from || !to) return current
       blocks[index] = to
       blocks[target] = from
+      const direction =
+        target + offset < 0 || target + offset >= blocks.length
+          ? -offset
+          : offset
+      const focusId = (direction < 0 ? 'move-up-' : 'move-down-') + id
+      requestAnimationFrame(() => document.getElementById(focusId)?.focus())
       return { ...current, blocks }
     })
   }
@@ -174,49 +238,61 @@ export function Editor({
   }
 
   async function readImport(file: File) {
+    const operation = ++importOperation.current
     try {
       const imported = await importProfile(file)
+      if (operation !== importOperation.current) return
       setNotice('')
       setPendingImport(imported)
     } catch (error) {
-      setNotice(message(error))
+      if (operation === importOperation.current) setNotice(message(error))
     }
+  }
+
+  function showProfile() {
+    clearAvatarOperation()
+    setSection('Profile')
+    setMobileTab('edit')
   }
 
   function acceptImport(imported: ProfileDocument) {
     dialog.current?.close()
-    avatarOperation.current++
-    setAvatarLoading(false)
-    setAvatarError('')
     update(() => imported)
-    setSection('Profile')
-    setMobileTab('edit')
+    showProfile()
     setPendingImport(null)
     setNotice('Profile imported.')
   }
 
   async function exportProfile(format: 'json' | 'zip') {
+    if (format === 'zip' && exporting) return
     const snapshot = latest.current
-    const problems = profileIssues(snapshot)
-    if (
-      problems.name ||
-      problems.blocks.some((block) => block.label || block.url)
-    ) {
+    if (format === 'zip') {
+      const problems = profileIssues(snapshot)
       const index = problems.blocks.findIndex(
         (block) => block.label || block.url,
       )
-      const id = problems.name
+      const profileField = problems.name
         ? 'profile-name'
-        : (problems.blocks[index]?.label ? 'label-' : 'url-') +
-          snapshot.blocks[index]?.id
-      setSection(problems.name ? 'Profile' : 'Links')
-      setMobileTab('edit')
-      setNotice('Complete the highlighted fields before downloading.')
-      requestAnimationFrame(() => document.getElementById(id)?.focus())
-      return
+        : problems.language
+          ? 'profile-language'
+          : ''
+      if (profileField || index >= 0) {
+        const id =
+          profileField ||
+          (problems.blocks[index]?.label ? 'label-' : 'url-') +
+            snapshot.blocks[index]?.id
+        setSection(profileField ? 'Profile' : 'Links')
+        setMobileTab('edit')
+        setNotice('Complete the highlighted fields before downloading.')
+        requestAnimationFrame(() => document.getElementById(id)?.focus())
+        return
+      }
     }
     try {
-      const clean = parseProfile(JSON.stringify(snapshot))
+      const clean = parseProfile(
+        JSON.stringify(snapshot),
+        format === 'zip' ? 'publish' : 'draft',
+      )
       if (format === 'json') {
         const blob = new Blob([JSON.stringify(clean, null, 2) + '\n'], {
           type: 'application/json',
@@ -232,7 +308,7 @@ export function Editor({
     } catch (error) {
       setNotice(message(error))
     } finally {
-      setExporting(false)
+      if (format === 'zip') setExporting(false)
     }
   }
 
@@ -283,12 +359,61 @@ export function Editor({
           </button>
         </div>
       </header>
-      {(status === 'unavailable' || status === 'invalid' || notice) && (
-        <div class="notice-strip" role="status">
-          {(status === 'unavailable' || status === 'invalid') && (
-            <p>{saveMessages[status]}</p>
+      {(!quietStatus || notice) && (
+        <div class="notice-strip">
+          <div class="notice-messages" role="status">
+            {!quietStatus && <p>{saveMessages[status]}</p>}
+            {notice && <p>{notice}</p>}
+          </div>
+          {otherDraft && (
+            <div class="draft-actions">
+              {otherDraft.status === 'invalid' ? (
+                <>
+                  <button
+                    class="button button-outline"
+                    onClick={() => {
+                      if (otherDraft.content !== null) {
+                        download(
+                          new Blob([otherDraft.content], {
+                            type: 'application/json',
+                          }),
+                          'rvnce-original-draft.json',
+                        )
+                      }
+                    }}
+                  >
+                    Download original
+                  </button>
+                  <button
+                    class="button button-outline"
+                    onClick={draft.replaceUnreadableDraft}
+                  >
+                    Replace saved draft
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    class="button button-outline"
+                    onClick={() => void exportProfile('json')}
+                  >
+                    Download my copy
+                  </button>
+                  <button
+                    class="button button-outline"
+                    onClick={() => {
+                      if (draft.loadStoredDraft()) {
+                        showProfile()
+                        setNotice('Saved draft loaded.')
+                      }
+                    }}
+                  >
+                    Load saved draft
+                  </button>
+                </>
+              )}
+            </div>
           )}
-          {notice && <p>{notice}</p>}
         </div>
       )}
       <nav class="mobile-nav" aria-label="Workspace">
@@ -309,7 +434,7 @@ export function Editor({
         <section class="settings" aria-labelledby="editor-title">
           <div class="editor-heading">
             <h1 id="editor-title">Edit profile</h1>
-            {(status === 'saved' || status === 'ready') && (
+            {quietStatus && (
               <span class="save-status" role="status">
                 <span aria-hidden="true" />
                 {saveMessages[status]}
@@ -339,7 +464,7 @@ export function Editor({
                 </div>
                 <div class="avatar-controls">
                   <span class="field-label">Profile photo</span>
-                  <p>PNG, JPG or WebP · up to 4 MB</p>
+                  <p>PNG, JPG or WebP · up to 4 MiB and 24 MP</p>
                   <div class="avatar-actions">
                     <input
                       ref={avatarInput}
@@ -388,7 +513,7 @@ export function Editor({
                   aria-invalid={Boolean(issues.name)}
                   aria-describedby={issues.name ? 'name-error' : undefined}
                   onInput={(event) => {
-                    const name = event.currentTarget.value
+                    const name = fieldValue(event.currentTarget)
                     update((current) => ({
                       ...current,
                       profile: { ...current.profile, name },
@@ -401,8 +526,10 @@ export function Editor({
                   </span>
                 )}
               </label>
-              <label class="field" for="profile-bio">
-                <span class="field-label">Bio</span>
+              <div class="field">
+                <label class="field-label" for="profile-bio">
+                  Bio
+                </label>
                 <textarea
                   id="profile-bio"
                   rows={4}
@@ -410,7 +537,7 @@ export function Editor({
                   maxLength={limits.bio}
                   aria-describedby="bio-limit"
                   onInput={(event) => {
-                    const bio = event.currentTarget.value
+                    const bio = fieldValue(event.currentTarget, true)
                     update((current) => ({
                       ...current,
                       profile: { ...current.profile, bio },
@@ -420,7 +547,49 @@ export function Editor({
                 <span class="character-count" id="bio-limit">
                   {doc.profile.bio.length} / {limits.bio}
                 </span>
-              </label>
+              </div>
+              <div class="field">
+                <label class="field-label" for="profile-language">
+                  Page language
+                </label>
+                <input
+                  id="profile-language"
+                  value={doc.profile.language}
+                  maxLength={limits.language}
+                  autoCapitalize="off"
+                  spellcheck={false}
+                  aria-invalid={Boolean(issues.language)}
+                  aria-describedby={
+                    issues.language ? 'language-error' : 'language-help'
+                  }
+                  onInput={(event) => {
+                    const language = fieldValue(event.currentTarget)
+                    update((current) => ({
+                      ...current,
+                      profile: { ...current.profile, language },
+                    }))
+                  }}
+                  onBlur={(event) => {
+                    const entered = event.currentTarget.value
+                    const language = profileLanguage(entered)
+                    if (language && language !== entered) {
+                      update((current) => ({
+                        ...current,
+                        profile: { ...current.profile, language },
+                      }))
+                    }
+                  }}
+                />
+                {issues.language ? (
+                  <span class="field-error" id="language-error">
+                    {issues.language}
+                  </span>
+                ) : (
+                  <span class="field-help" id="language-help">
+                    Use a language tag such as en, ru, or pt-BR.
+                  </span>
+                )}
+              </div>
             </div>
           )}
           {section === 'Links' && (
@@ -439,6 +608,7 @@ export function Editor({
                     <div class="link-tools">
                       <button
                         class="icon-button"
+                        id={'move-up-' + block.id}
                         disabled={index === 0}
                         aria-label={'Move ' + label + ' up'}
                         onClick={() => moveLink(block.id, -1)}
@@ -447,6 +617,7 @@ export function Editor({
                       </button>
                       <button
                         class="icon-button"
+                        id={'move-down-' + block.id}
                         disabled={index === doc.blocks.length - 1}
                         aria-label={'Move ' + label + ' down'}
                         onClick={() => moveLink(block.id, 1)}
@@ -472,7 +643,11 @@ export function Editor({
                           issue?.label ? 'label-error-' + block.id : undefined
                         }
                         onInput={(event) =>
-                          editLink(block.id, 'label', event.currentTarget.value)
+                          editLink(
+                            block.id,
+                            'label',
+                            fieldValue(event.currentTarget),
+                          )
                         }
                       />
                       {issue?.label && (
@@ -497,7 +672,11 @@ export function Editor({
                           issue?.url ? 'url-error-' + block.id : undefined
                         }
                         onInput={(event) =>
-                          editLink(block.id, 'url', event.currentTarget.value)
+                          editLink(
+                            block.id,
+                            'url',
+                            fieldValue(event.currentTarget),
+                          )
                         }
                       />
                       {issue?.url && (
@@ -630,20 +809,11 @@ export function Editor({
             </div>
           </div>
           <div
-            class="preview-frame"
+            class="preview-frame profile-viewport"
             data-device={device}
             style={palette}
-            onClick={(event) => {
-              if (
-                event.target instanceof Element &&
-                event.target.closest('.profile-links a')
-              ) {
-                event.preventDefault()
-                setNotice('Preview links open on the published page.')
-              }
-            }}
           >
-            <PublicProfile doc={previewDoc} avatarUrl={avatar} />
+            <PublicProfile doc={previewDoc} avatarUrl={avatar} preview />
           </div>
         </section>
       </main>
@@ -658,8 +828,10 @@ export function Editor({
             <h2 id="import-title">Replace current profile?</h2>
             <p>
               This will replace your draft with{' '}
-              <strong>{pendingImport.profile.name}</strong>. Export the current
-              draft first if you need a copy.
+              <strong>
+                {pendingImport.profile.name.trim() || 'an unnamed profile'}
+              </strong>
+              . Export the current draft first if you need a copy.
             </p>
             <div class="dialog-actions">
               <button

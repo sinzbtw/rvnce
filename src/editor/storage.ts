@@ -1,32 +1,50 @@
 import { parseProfile, type ProfileDocument } from '../profile/document'
 
-const draftKey = 'rvnce.draft.v1'
+export const draftKey = 'rvnce.draft.v1'
 
-export type DraftStatus = 'ready' | 'saved' | 'unavailable' | 'invalid'
-
-export function readDraft(): {
+export interface StoredDraft {
   doc: ProfileDocument | null
-  status: DraftStatus
-} {
+  content: string | null
+  status: 'ready' | 'saved' | 'unavailable' | 'invalid' | 'recovered'
+}
+
+export function readDraft(): StoredDraft {
   let content: string | null
   try {
     content = localStorage.getItem(draftKey)
   } catch {
-    return { doc: null, status: 'unavailable' }
+    return { doc: null, content: null, status: 'unavailable' }
   }
-  if (content === null) return { doc: null, status: 'ready' }
+  if (content === null) return { doc: null, content, status: 'ready' }
   try {
-    return { doc: parseProfile(content, true), status: 'saved' }
+    return { doc: parseProfile(content, 'draft'), content, status: 'saved' }
   } catch {
-    return { doc: null, status: 'invalid' }
+    try {
+      return {
+        doc: parseProfile(content, 'recover'),
+        content,
+        status: 'recovered',
+      }
+    } catch {
+      return { doc: null, content, status: 'invalid' }
+    }
   }
 }
 
-export function saveDraft(doc: ProfileDocument): DraftStatus {
+export function saveDraft(doc: ProfileDocument, expected: string | null) {
+  const content = JSON.stringify(doc)
   try {
-    localStorage.setItem(draftKey, JSON.stringify(doc))
-    return 'saved'
+    parseProfile(content, 'draft')
   } catch {
-    return 'unavailable'
+    return { status: 'invalid-edit' } as const
+  }
+  try {
+    if (localStorage.getItem(draftKey) !== expected) {
+      return { status: 'conflict' } as const
+    }
+    localStorage.setItem(draftKey, content)
+    return { status: 'saved', content } as const
+  } catch {
+    return { status: 'unavailable' } as const
   }
 }

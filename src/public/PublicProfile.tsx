@@ -1,4 +1,4 @@
-import { type ProfileDocument } from '../profile/document'
+import { profileLanguage, type ProfileDocument } from '../profile/document'
 
 function initials(name: string): string {
   return name
@@ -13,15 +13,22 @@ function initials(name: string): string {
 export function PublicProfile({
   doc,
   avatarUrl,
+  preview = false,
 }: {
   doc: ProfileDocument
   avatarUrl: string | null
+  preview?: boolean
 }) {
   const { profile, appearance, blocks } = doc
   const name = profile.name.trim() || 'Your name'
 
   return (
-    <article class="public-profile" data-variant={appearance.variant}>
+    <article
+      class="public-profile"
+      data-variant={appearance.variant}
+      lang={profileLanguage(profile.language)}
+      dir="auto"
+    >
       <header class="profile-intro">
         <h1 class="profile-name">{name}</h1>
         <div class="profile-portrait">
@@ -35,9 +42,9 @@ export function PublicProfile({
       </header>
       {blocks.length > 0 && (
         <ul class="profile-links" aria-label="Profile links" role="list">
-          {blocks.map((block) => (
-            <li key={block.id}>
-              <a href={block.url.trim()} rel="noreferrer">
+          {blocks.map((block) => {
+            const content = (
+              <>
                 <span>{block.label.trim()}</span>
                 <svg
                   aria-hidden="true"
@@ -54,9 +61,24 @@ export function PublicProfile({
                     stroke-linejoin="round"
                   />
                 </svg>
-              </a>
-            </li>
-          ))}
+              </>
+            )
+            return (
+              <li key={block.id}>
+                {preview ? (
+                  <span class="profile-link">{content}</span>
+                ) : (
+                  <a
+                    class="profile-link"
+                    href={block.url.trim()}
+                    rel="noreferrer"
+                  >
+                    {content}
+                  </a>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </article>

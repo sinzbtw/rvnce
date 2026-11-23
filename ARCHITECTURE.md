@@ -8,9 +8,10 @@ or where a component writes its output.
 flowchart LR
     Entry["Browser entry · main.tsx"] -->|"loads draft"| Draft["Draft storage · editor/storage.ts"]
     Entry -->|"mounts with draft or sample"| Editor["Profile editor · editor/Editor.tsx"]
-    Editor -->|"saves changes"| Draft
+    Editor -->|"tracks edits, saves, and resolves conflicts"| DraftSession["Draft state · editor/useDraft.ts"]
+    DraftSession -->|"reads and writes revisions"| Draft
     Draft -->|"reads and writes"| Local[("Browser localStorage")]
-    Draft -->|"parses stored drafts"| Profile["ProfileDocument v1 and validation · profile/document.ts"]
+    Draft -->|"parses stored drafts"| Profile["ProfileDocument v2 and validation · profile/document.ts"]
     Editor -->|"checks fields and validates exports"| Profile
     Editor -->|"imports, normalizes images, and downloads"| Files["Browser file I/O · editor/files.ts"]
     Files -->|"validates imported profiles"| Profile
@@ -27,19 +28,21 @@ flowchart LR
 ## Boundaries
 
 - **Profile and draft.** [ProfileDocument](src/profile/document.ts) defines
-  schema version 1, including profile details, appearance, and ordered link
-  blocks. Imports and downloads require a complete, valid document. The
-  [draft reader](src/editor/storage.ts) uses draft validation so it can restore
-  incomplete name and link fields.
+  schema version 2, including profile details, page language, appearance, and
+  ordered link blocks. Version 1 profiles are upgraded with the language
+  `en`. JSON backup, import, and browser storage use draft validation so
+  incomplete fields can be restored. ZIP export validates the complete profile.
 - **Editor.** [Editor](src/editor/Editor.tsx) owns the draft and preview state.
   [Browser file I/O](src/editor/files.ts) validates imported JSON and decodes
   its avatar before the editor prompts for confirmation. A confirmed import
-  replaces the draft through the same save path as ordinary edits. The live
-  preview omits incomplete links as the user edits them.
+  replaces the draft through the same save path as ordinary edits. The
+  [draft state](src/editor/useDraft.ts) batches saves and pauses writes when
+  the stored revision changes. The live preview omits incomplete links and
+  displays complete links as static content.
 - **Public page.** [PublicProfile](src/public/PublicProfile.tsx) renders the
   supplied profile and avatar URL. [siteFiles](src/export/site.tsx) uses that
   component to produce HTML, CSS, and local assets with relative paths. The
-  browser [ZIP exporter](src/editor/site-download.ts) packages those files, and
+  browser [ZIP exporter](src/editor/site-download.ts) re-encodes the avatar and packages those files, and
   the [demo build](scripts/build-demo.ts) writes the same file layout to a
   directory. Published profile pages run without JavaScript.
 

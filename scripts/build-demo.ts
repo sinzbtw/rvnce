@@ -33,6 +33,7 @@ await Promise.all(
 )
 if (!dev) {
   await writeFile(join(output, '.nojekyll'), '')
+  await writeFile(join(output, 'assets', 'manrope-OFL.txt'), fontLicense)
   const bundles = (await readdir(join(output, 'assets'))).filter((name) =>
     /\.(js|css)$/u.test(name),
   )

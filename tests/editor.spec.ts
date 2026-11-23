@@ -2,7 +2,9 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { crc32 } from 'node:zlib'
 import { unzipSync } from 'fflate'
+import { demoProfile } from '../src/profile/demo'
 import type { ProfileDocument } from '../src/profile/document'
 
 const avatarFixture = new URL('../src/assets/mira-park.png', import.meta.url)
@@ -14,6 +16,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
   await page.goto('/')
   await page.getByLabel('Display name').fill('Ира Moon')
   await page.getByLabel('Bio').fill('Studio notes & visual work.')
+  await page.getByLabel('Page language').fill('ru')
   await page
     .locator('input[accept="image/png,image/jpeg,image/webp"]')
     .setInputFiles({
@@ -30,7 +33,11 @@ test('edits, restores, imports and exports a standalone profile', async ({
   await newLink.getByLabel('Label').fill('Work')
   await newLink.getByLabel('URL').fill('https://example.org/work')
   await page.getByRole('button', { name: 'Move Work up' }).click()
-  await expect(page.locator('.public-profile a').nth(2)).toHaveText('Work')
+  await expect(page.locator('.profile-link').nth(2)).toHaveText('Work')
+  await page.getByRole('button', { name: 'Move Work down' }).press('Enter')
+  await expect(page.getByRole('button', { name: 'Move Work up' })).toBeFocused()
+  await page.getByRole('button', { name: 'Move Work up' }).press('Enter')
+  await expect(page.locator('.public-profile a')).toHaveCount(0)
   await page.getByRole('button', { name: 'Appearance' }).click()
   await page.getByRole('radio', { name: 'Dark' }).check()
   await page.getByRole('button', { name: 'Forest' }).click()
@@ -40,7 +47,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
     'data-variant',
     'dark',
   )
-  await expect(page.locator('.public-profile a').nth(2)).toHaveText('Work')
+  await expect(page.locator('.profile-link').nth(2)).toHaveText('Work')
 
   const jsonEvent = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON' }).click()
@@ -116,6 +123,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
       'https://example.org/work',
     )
     await expect(published.locator('script')).toHaveCount(0)
+    await expect(published.locator('html')).toHaveAttribute('lang', 'ru')
     expect(httpRequests).toEqual(
       expect.arrayContaining([
         prefix + 'profile.css',
@@ -151,9 +159,22 @@ test('warns when storage is unavailable and keeps exports usable', async ({
   await page.getByLabel('Display name').fill('Local only')
   await expect(page.locator('.public-profile h1')).toHaveText('Local only')
   await expect(warning).toBeVisible()
+  await page.getByRole('button', { name: 'Links', exact: true }).click()
+  await page.getByRole('button', { name: 'Add link' }).click()
+  await page
+    .getByRole('group', { name: 'Link 4' })
+    .getByText('Enter a link label.')
+    .waitFor()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON' }).click()
-  expect((await download).suggestedFilename()).toBe('rvnce-profile.json')
+  const backup = await download
+  expect(backup.suggestedFilename()).toBe('rvnce-profile.json')
+  await page
+    .locator('input[accept=".json,application/json"]')
+    .setInputFiles((await backup.path())!)
+  await page.getByRole('button', { name: 'Replace profile' }).click()
+  await page.getByRole('button', { name: 'Links', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'Link 4' })).toBeVisible()
 })
 
 test('preserves incomplete edits and focuses the invalid field on export', async ({
@@ -174,6 +195,224 @@ test('preserves incomplete edits and focuses the invalid field on export', async
   await expect(
     page.getByText('Complete the highlighted fields before downloading.'),
   ).toBeVisible()
+})
+
+test('protects edits across tabs and offers a copy of the conflicting draft', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/')
+  await expect(page.getByLabel('Display name')).toHaveValue('Mira Park')
+  const second = await context.newPage()
+  await second.goto('/')
+  await expect(second.getByLabel('Display name')).toHaveValue('Mira Park')
+
+  await page.getByLabel('Display name').fill('Saved in the first tab')
+  await expect(page.getByText('Saved locally')).toBeVisible()
+  await expect(
+    second.getByText('The saved draft changed in another tab.', {
+      exact: false,
+    }),
+  ).toBeVisible()
+  await second
+    .getByLabel('Bio', { exact: true })
+    .fill('Local bio in the second tab')
+  const download = second.waitForEvent('download')
+  await second.getByRole('button', { name: 'Download my copy' }).click()
+  const file = await download
+  const backup = JSON.parse(
+    await readFile((await file.path())!, 'utf8'),
+  ) as ProfileDocument
+  expect(backup.profile.bio).toBe('Local bio in the second tab')
+
+  await second.getByRole('button', { name: 'Load saved draft' }).click()
+  await expect(second.getByLabel('Display name')).toHaveValue(
+    'Saved in the first tab',
+  )
+  await expect(second.getByLabel('Bio', { exact: true })).toHaveValue(
+    demoProfile(null).profile.bio,
+  )
+  await second.getByLabel('Bio', { exact: true }).fill('Updated after loading')
+  await expect(second.getByText('Saved locally')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Display name')).toHaveValue(
+    'Saved in the first tab',
+  )
+  await expect(page.getByLabel('Bio', { exact: true })).toHaveValue(
+    'Updated after loading',
+  )
+})
+
+test('recovers an old draft and preserves edited text with page breaks', async ({
+  page,
+}) => {
+  const legacy = {
+    ...demoProfile(null),
+    schemaVersion: 1,
+    profile: { name: 'Recovered draft', bio: 'First\fSecond', avatar: null },
+  }
+  await page.addInitScript((raw) => {
+    if (localStorage.getItem('rvnce.draft.v1') === null)
+      localStorage.setItem('rvnce.draft.v1', raw)
+  }, JSON.stringify(legacy))
+  await page.goto('/')
+  await expect(
+    page.getByText('The saved draft was recovered.', { exact: false }),
+  ).toBeVisible()
+  await expect(page.getByLabel('Display name')).toHaveValue('Recovered draft')
+  await expect(page.getByLabel('Bio', { exact: true })).toHaveValue(
+    'First\nSecond',
+  )
+  await page.getByLabel('Bio', { exact: true }).fill('Left\fRight')
+  await expect(page.getByText('Saved locally')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Bio', { exact: true })).toHaveValue(
+    'Left\nRight',
+  )
+})
+
+test('keeps unreadable storage until replacement is explicitly requested', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('rvnce.draft.v1') === null)
+      localStorage.setItem('rvnce.draft.v1', '{"previous":')
+  })
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Replacement draft')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download original' }).click()
+  const original = await download
+  expect(await readFile((await original.path())!, 'utf8')).toBe('{"previous":')
+  await page.getByRole('button', { name: 'Replace saved draft' }).click()
+  await expect(page.getByText('Saved locally')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Display name')).toHaveValue('Replacement draft')
+})
+
+test('ignores an older import that finishes after a newer selection', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const read = File.prototype.text
+    File.prototype.text = async function () {
+      if (this.name !== 'older.json') return read.call(this)
+      await new Promise<void>((resolve) => {
+        window.addEventListener('release-older-import', () => resolve(), {
+          once: true,
+        })
+      })
+      const text = await read.call(this)
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new Event('older-import-read'))
+        }),
+      )
+      return text
+    }
+  })
+  await page.goto('/')
+  const input = page.locator('input[accept=".json,application/json"]')
+  const doc = demoProfile(null)
+  doc.profile.name = 'Older selection'
+  await input.setInputFiles({
+    name: 'older.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(doc)),
+  })
+  doc.profile.name = 'Newer selection'
+  await input.setInputFiles({
+    name: 'newer.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(doc)),
+  })
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Newer selection')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Replace profile' }).click()
+  await expect(page.getByLabel('Display name')).toHaveValue('Newer selection')
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        window.addEventListener('older-import-read', () => resolve(), {
+          once: true,
+        })
+        window.dispatchEvent(new Event('release-older-import'))
+      }),
+  )
+  await expect(dialog).toBeHidden()
+  await expect(page.getByLabel('Display name')).toHaveValue('Newer selection')
+})
+
+test('opens while the sample image loads, reports bad photos, and retries ZIP export', async ({
+  page,
+}) => {
+  let releaseSample!: () => void
+  const sample = new Promise<void>((resolve) => {
+    releaseSample = resolve
+  })
+  await page.route('**/mira-park-*.png', async (route) => {
+    await sample
+    await route.continue()
+  })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  try {
+    await expect(page.getByLabel('Display name')).toHaveValue('Mira Park')
+    await expect(page.locator('.profile-portrait img')).toHaveCount(0)
+  } finally {
+    releaseSample()
+  }
+  await expect(page.locator('.profile-portrait img')).toBeVisible()
+
+  const png = await readFile(avatarFixture)
+  await page
+    .locator('input[accept="image/png,image/jpeg,image/webp"]')
+    .setInputFiles({
+      name: 'incomplete.png',
+      mimeType: 'image/png',
+      buffer: png.subarray(0, 33),
+    })
+  await expect(page.getByRole('alert')).toHaveText(
+    'This image could not be opened.',
+  )
+
+  const metadata = Buffer.from('tEXtComment\0Rvnce test note')
+  const chunk = Buffer.alloc(metadata.length + 8)
+  chunk.writeUInt32BE(metadata.length - 4)
+  metadata.copy(chunk, 4)
+  chunk.writeUInt32BE(crc32(metadata), chunk.length - 4)
+  const iend = png.length - 12
+  const doc = demoProfile(
+    Buffer.concat([png.subarray(0, iend), chunk, png.subarray(iend)]).toString(
+      'base64',
+    ),
+  )
+  await page.locator('input[accept=".json,application/json"]').setInputFiles({
+    name: 'profile.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(doc)),
+  })
+  await page.getByRole('button', { name: 'Replace profile' }).click()
+
+  await page.route('**/*.woff2', (route) =>
+    route.request().resourceType() === 'fetch'
+      ? route.abort()
+      : route.continue(),
+  )
+  const button = page.getByRole('button', { name: 'Download site' })
+  await button.click()
+  await expect(
+    page.getByText('An export asset could not load. Try again.'),
+  ).toBeVisible()
+  await expect(button).toBeEnabled()
+  await page.unroute('**/*.woff2')
+  const download = page.waitForEvent('download')
+  await button.click()
+  const zip = await download
+  const files = unzipSync(await readFile((await zip.path())!))
+  expect(files['avatar.png']).toBeDefined()
+  expect(Buffer.from(files['avatar.png']!).includes('Rvnce test note')).toBe(
+    false,
+  )
 })
 
 test('checks keyboard, contrast, mobile layout, long content and reduced motion', async ({
@@ -239,6 +478,13 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
     }
   }
   await page.getByRole('button', { name: 'Editor', exact: true }).click()
+  const largeText = await page.addStyleTag({
+    content: 'html { font-size: 200%; }',
+  })
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(320)
+  await largeText.evaluate((style) => style.parentNode?.removeChild(style))
   await page.getByLabel('Display name').fill('ДлинноеИмя'.repeat(8))
   await page.getByRole('button', { name: 'Links', exact: true }).click()
   await page

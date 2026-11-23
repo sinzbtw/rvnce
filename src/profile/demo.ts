@@ -2,11 +2,12 @@ import { defaultAccent, type ProfileDocument } from './document'
 
 export function demoProfile(avatar: string | null): ProfileDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     profile: {
       name: 'Mira Park',
       bio: 'Independent designer making posters, type, and other things destined for a wall.',
       avatar,
+      language: 'en',
     },
     appearance: { theme: 'rvnce', variant: 'light', accent: defaultAccent },
     blocks: [

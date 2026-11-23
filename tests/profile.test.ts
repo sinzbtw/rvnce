@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { siteFiles } from '../src/export/site'
 import { demoProfile } from '../src/profile/demo'
-import { limits, parseProfile, validUrl } from '../src/profile/document'
+import {
+  editableText,
+  limits,
+  parseProfile,
+  validUrl,
+} from '../src/profile/document'
+import { checkImageSize } from '../src/editor/image-size'
 import { accentInk } from '../src/public/colors'
 
 const samplePng = readFileSync(
@@ -16,7 +22,7 @@ const emptyAssets = {
   fontLicense: new Uint8Array(),
 }
 
-describe('Rvnce profile v1', () => {
+describe('Rvnce profile documents', () => {
   it('round-trips a profile and raster avatar', () => {
     const doc = demoProfile(samplePng.toString('base64'))
     doc.profile.name = 'Мира Пак'
@@ -28,14 +34,14 @@ describe('Rvnce profile v1', () => {
     doc.profile.name = ''
     doc.blocks[0]!.url = 'ht'
     const raw = JSON.stringify(doc)
-    expect(parseProfile(raw, true)).toEqual(doc)
+    expect(parseProfile(raw, 'draft')).toEqual(doc)
     expect(() => parseProfile(raw)).toThrow('complete every link')
   })
 
   it('rejects broken JSON, unsupported versions, oversized payloads, and unknown keys', () => {
     expect(() => parseProfile('{')).toThrow('valid JSON')
     expect(() =>
-      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 2 })),
+      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 3 })),
     ).toThrow('unsupported')
     expect(() => parseProfile('x'.repeat(limits.documentBytes + 1))).toThrow(
       'smaller',
@@ -78,6 +84,31 @@ describe('Rvnce profile v1', () => {
     expect(validUrl('https://example.org/a%20b?x=1#test')).toBe(true)
   })
 
+  it('upgrades legacy documents and recovers text written by older editors', () => {
+    const legacy = {
+      ...demoProfile(null),
+      schemaVersion: 1,
+      profile: { name: 'Mira', bio: 'First\fSecond', avatar: null },
+    }
+    const raw = JSON.stringify(legacy)
+    expect(() => parseProfile(raw, 'draft')).toThrow('profile details')
+    expect(parseProfile(raw, 'recover')).toMatchObject({
+      schemaVersion: 2,
+      profile: { name: 'Mira', bio: 'First\nSecond', language: 'en' },
+    })
+    expect(editableText('First\fSecond', true)).toBe('First\nSecond')
+    legacy.profile.bio = 'Valid legacy bio'
+    expect(parseProfile(JSON.stringify(legacy)).profile.language).toBe('en')
+  })
+
+  it('requires a well-formed language for a published profile', () => {
+    const doc = demoProfile(null)
+    doc.profile.language = 'pt_BR'
+    const raw = JSON.stringify(doc)
+    expect(parseProfile(raw, 'draft')).toEqual(doc)
+    expect(() => parseProfile(raw)).toThrow('language tag')
+  })
+
   it('chooses legible ink on dark, light and midtone accents', () => {
     expect(accentInk('#000000')).toBe('#ffffff')
     expect(accentInk('#ffffff')).toBe('#000000')
@@ -90,6 +121,7 @@ describe('standalone public site', () => {
   it('serializes safe text, relative resources, an avatar and the required files', () => {
     const doc = demoProfile(samplePng.toString('base64'))
     doc.profile.name = '<em>Mira & Co</em>'
+    doc.profile.language = 'PT-br'
     doc.profile.bio = 'Photo by "Mira".'
     doc.blocks[0]!.url = 'https://www.are.na/?a=1&b=2'
     const files = siteFiles(doc, emptyAssets)
@@ -112,6 +144,7 @@ describe('standalone public site', () => {
       'profile.css',
     ])
     const html = strFromU8(unpacked['index.html']!)
+    expect(html).toContain('<html lang="pt-BR">')
     expect(html).toMatch(/&lt;em(?:>|&gt;)Mira &amp; Co&lt;\/em(?:>|&gt;)/u)
     expect(html).not.toContain('<em>')
     expect(html).toContain('Photo by &quot;Mira&quot;.')
@@ -129,5 +162,46 @@ describe('standalone public site', () => {
     const files = siteFiles(demoProfile(null), emptyAssets)
     expect(files['avatar.png']).toBeUndefined()
     expect(files['index.html']).toContain('>MP</span>')
+  })
+})
+
+describe('avatar upload dimensions', () => {
+  it('accepts supported raster headers and rejects oversized or truncated ones', () => {
+    const png = Uint8Array.from(samplePng.slice(0, 24))
+    const jpeg = Uint8Array.from([
+      0xff, 0xd8, 0xff, 0xc0, 0, 8, 8, 1, 128, 1, 128, 1,
+    ])
+    const webp = Uint8Array.from([
+      ...'RIFF'.split('').map((character) => character.charCodeAt(0)),
+      22,
+      0,
+      0,
+      0,
+      ...'WEBPVP8X'.split('').map((character) => character.charCodeAt(0)),
+      10,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      127,
+      1,
+      0,
+      127,
+      1,
+      0,
+    ])
+    for (const image of [png, jpeg, webp]) {
+      expect(() => checkImageSize(image.buffer)).not.toThrow()
+      expect(() => checkImageSize(image.slice(0, 10).buffer)).toThrow(
+        'readable',
+      )
+    }
+    const size = new DataView(png.buffer)
+    size.setUint32(16, 6000)
+    size.setUint32(20, 4001)
+    expect(() => checkImageSize(png.buffer)).toThrow('24 megapixels')
   })
 })

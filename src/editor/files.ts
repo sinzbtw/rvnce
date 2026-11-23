@@ -4,6 +4,7 @@ import {
   parseProfile,
   type ProfileDocument,
 } from '../profile/document'
+import { checkImageSize } from './image-size'
 
 export function pngDataUrl(encoded: string): string {
   return 'data:image/png;base64,' + encoded
@@ -24,18 +25,15 @@ export function encodeAvatar(blob: Blob): Promise<string> {
 
 export async function normalizeAvatar(file: File): Promise<string> {
   if (file.size > limits.uploadBytes)
-    throw new Error('Choose an image smaller than 4 MB.')
-  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer())
-  const tag = new TextDecoder().decode(header)
-  const png = header[0] === 137 && tag.slice(1, 4) === 'PNG'
-  const jpeg = header[0] === 255 && header[1] === 216 && header[2] === 255
-  const webp = tag.startsWith('RIFF') && tag.endsWith('WEBP')
-  if (!(png || jpeg || webp))
-    throw new Error('Choose a PNG, JPEG, or WebP image.')
+    throw new Error('Choose an image up to 4 MiB.')
+  checkImageSize(await file.arrayBuffer())
+  return encodeAvatar(await canvasPng(file))
+}
 
+async function canvasPng(source: Blob): Promise<Blob> {
   let image: ImageBitmap
   try {
-    image = await createImageBitmap(file)
+    image = await createImageBitmap(source)
   } catch {
     throw new Error('This image could not be opened.')
   }
@@ -55,21 +53,29 @@ export async function normalizeAvatar(file: File): Promise<string> {
     )
     if (!blob || blob.size > limits.avatarBytes)
       throw new Error('The resized avatar is too large.')
-    return await encodeAvatar(blob)
+    return blob
   } finally {
     image.close()
   }
 }
 
+function pngBlob(encoded: string) {
+  return new Blob([avatarBytes(encoded)], { type: 'image/png' })
+}
+
+export async function publishedAvatar(
+  encoded: string,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await (await canvasPng(pngBlob(encoded))).arrayBuffer())
+}
+
 export async function importProfile(file: File): Promise<ProfileDocument> {
   if (file.size > limits.documentBytes)
     throw new Error('Choose a Rvnce JSON file smaller than 1.2 MB.')
-  const doc = parseProfile(await file.text())
+  const doc = parseProfile(await file.text(), 'draft')
   if (doc.profile.avatar) {
     try {
-      const image = await createImageBitmap(
-        new Blob([avatarBytes(doc.profile.avatar)], { type: 'image/png' }),
-      )
+      const image = await createImageBitmap(pngBlob(doc.profile.avatar))
       image.close()
     } catch {
       throw new Error('The avatar in this profile could not be opened.')

@@ -10,7 +10,7 @@ The latest published version and `main` are supported.
 
 ## Current trust model
 
-Rvnce v1 stores one draft in the browser and validates imported JSON before applying it. Links are limited to HTTP(S). Profile text is rendered as text. An avatar is decoded as a raster image, and uploads are resized and encoded as PNG. The standalone HTML includes a content security policy and uses local CSS, fonts, and images. Site visitors connect to a link's destination when they follow that link.
+Rvnce stores one draft in the browser and validates imported JSON before applying it. Published links are limited to HTTP(S). Profile text is rendered as text. Avatar uploads have file size and pixel limits, are decoded as raster images, and are resized and encoded as PNG. ZIP export re-encodes the avatar, removing source metadata. A JSON backup can retain the PNG bytes from an imported draft. The standalone HTML includes a content security policy and uses local CSS, fonts, and images. Site visitors connect to a link's destination when they follow that link.
 
 Drafts are stored per browser origin. Anyone with access to that browser profile can read the local draft. Downloaded JSON and ZIP files contain any personal content the author entered.
 
