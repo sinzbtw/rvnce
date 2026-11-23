@@ -1,0 +1,16 @@
+name: Documentation improvement
+description: Report a mistake or suggest clearer documentation
+labels: [documentation]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Page or section
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: What is missing or unclear?
+    validations:
+      required: true
