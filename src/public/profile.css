@@ -1,0 +1,147 @@
+.public-profile {
+  --paper: #eae5fc;
+  --ink: #19152a;
+  --muted: #4b4365;
+  --secondary: #fb987e;
+  --tertiary: #f9f7ff;
+  --line: #8f83b3;
+  box-sizing: border-box;
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(24px, 5vw, 46px);
+  color: var(--ink);
+  background: var(--paper);
+  font-family: 'Manrope Variable', system-ui, sans-serif;
+  text-align: start;
+}
+
+.public-profile[data-variant='dark'] {
+  --paper: #221c35;
+  --ink: #f5efff;
+  --muted: #d6c9ef;
+  --secondary: #f9a78e;
+  --tertiary: #302644;
+  --line: #9786be;
+}
+
+.profile-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(62px, 32%);
+  gap: 13px 16px;
+  align-items: end;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: clamp(1.75rem, 14cqi, 4.75rem);
+  line-height: 0.98;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.profile-portrait {
+  position: relative;
+  display: grid;
+  align-self: start;
+  grid-column: 2;
+  grid-row: 1;
+  place-items: center;
+  aspect-ratio: 0.88;
+  min-width: 0;
+  margin: 0 7px 6px 0;
+  isolation: isolate;
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-size: clamp(1.2rem, 7cqi, 2rem);
+  font-weight: 800;
+}
+
+.profile-portrait::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border: 1px solid var(--line);
+  transform: translate(7px, 6px);
+  content: '';
+}
+
+.profile-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-bio {
+  grid-column: 1 / -1;
+  max-width: 38ch;
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: clamp(0.875rem, 3.8cqi, 1rem);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.profile-links {
+  display: grid;
+  gap: 9px;
+  margin: 29px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-links a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 50px;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-weight: 800;
+  font-size: 0.875rem;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.profile-links li:nth-child(3n + 2) a {
+  color: #19152a;
+  background: var(--secondary);
+}
+
+.profile-links li:nth-child(3n + 3) a {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--tertiary);
+}
+
+.profile-links a svg {
+  flex: none;
+}
+
+.profile-links a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-links a:hover {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-links a {
+    transition: none;
+  }
+
+  .profile-links a:hover {
+    transform: none;
+  }
+}
