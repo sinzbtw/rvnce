@@ -263,7 +263,11 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
     ).violations,
   ).toEqual([])
 
-  await page.goto('/demo/')
+  const demoHref = await page
+    .getByRole('link', { name: 'View demo' })
+    .getAttribute('href')
+  expect(demoHref).toBe('./demo/index.html')
+  await page.goto(new URL(demoHref!, page.url()).href)
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await expect(page.getByRole('heading', { name: 'Mira Park' })).toBeVisible()

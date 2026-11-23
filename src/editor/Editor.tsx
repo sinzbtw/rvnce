@@ -621,7 +621,7 @@ export function Editor({
               </div>
               <a
                 class="demo-link"
-                href="./demo/"
+                href="./demo/index.html"
                 target="_blank"
                 rel="noopener noreferrer"
               >

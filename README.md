@@ -4,6 +4,8 @@
 
 Rvnce is an open-source editor for personal bio pages. Build a profile in your browser, preview it as you edit, and download a standalone site you can host yourself.
 
+[Open the editor](https://sinzbtw.github.io/rvnce/) · [View the sample profile](https://sinzbtw.github.io/rvnce/demo/)
+
 ## What you can do
 
 - Edit a display name, bio, and photo. Upload a PNG, JPEG, or WebP image up to 4 MB.
