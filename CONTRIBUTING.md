@@ -31,4 +31,6 @@ Run `npm run format` to apply Prettier. On Linux, `npx playwright install --with
 
 Fork the repository, branch from `main`, and keep the change focused. In the PR template, explain what changed and why, record the checks you ran, and link the issue when one exists. Include before and after screenshots for visual changes. Add a regression test when the existing suite would miss a changed behavior. Keep user-facing documentation synchronized in both languages.
 
+Write commit messages using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
 Use strict TypeScript and share profile rendering between preview and export. Keep browser storage and downloads in the editor. Preserve relative paths in exports. Use assets with documented rights and keep dependency additions small. See [AGENTS.md](AGENTS.md) for repository conventions.
