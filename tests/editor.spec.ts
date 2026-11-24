@@ -20,6 +20,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
     JSON.stringify(demoProfile(null)),
   )
   await page.goto('/')
+  await page.getByRole('button', { name: 'Show preview' }).click()
   await page.getByLabel('Display name').fill('Ира Moon')
   await page.getByLabel('Bio').fill('Studio notes & visual work.')
   await page.getByLabel('Page language').fill('ru')
@@ -31,6 +32,15 @@ test('edits, restores, imports and exports a standalone profile', async ({
       buffer: await readFile(avatarFixture),
     })
   await expect(page.getByRole('button', { name: 'Change photo' })).toBeEnabled()
+  await page.locator('#favicon-file').setInputFiles({
+    name: 'tab-icon.png',
+    mimeType: 'image/png',
+    buffer: await readFile(avatarFixture),
+  })
+  await expect(page.locator('.preview-tab img')).toHaveJSProperty(
+    'naturalWidth',
+    64,
+  )
   await expect(page.locator('.public-profile h1')).toHaveText('Ира Moon')
   await page.getByRole('button', { name: 'Links', exact: true }).click()
   await page.getByRole('button', { name: 'Add link' }).click()
@@ -50,6 +60,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
   await page.getByLabel('Accent color', { exact: true }).fill('#176451')
   await expect(page.getByText('Saved locally')).toBeVisible()
   await page.reload()
+  await page.getByRole('button', { name: 'Show preview' }).click()
   await expect(page.getByLabel('Display name')).toHaveValue('Ира Moon')
   await expect(page.locator('.public-profile')).toHaveAttribute(
     'data-variant',
@@ -66,6 +77,8 @@ test('edits, restores, imports and exports a standalone profile', async ({
     await readFile(jsonPath!, 'utf8'),
   ) as ProfileDocument
   expect(profile.profile.avatar).toBeTruthy()
+  expect(profile.schemaVersion).toBe(4)
+  expect(profile.branding.favicon).toBeTruthy()
   expect(profile.appearance.accent).toBe('#176451')
 
   const input = page.locator('input[accept=".json,application/json"]')
@@ -132,6 +145,15 @@ test('edits, restores, imports and exports a standalone profile', async ({
     )
     await expect(published.locator('script')).toHaveCount(0)
     await expect(published.locator('html')).toHaveAttribute('lang', 'ru')
+    await expect(published.locator('link[rel="icon"]')).toHaveAttribute(
+      'href',
+      './favicon.png',
+    )
+    const icon = await published.request.get(
+      'http://127.0.0.1:' + address.port + prefix + 'favicon.png',
+    )
+    expect(icon.ok()).toBe(true)
+    expect((await icon.body()).readUInt32BE(16)).toBe(64)
     expect(httpRequests).toEqual(
       expect.arrayContaining([
         prefix + 'profile.css',
@@ -421,7 +443,7 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
     page.getByRole('heading', { name: 'Edit profile' }),
   ).toBeVisible()
   await page.keyboard.press('Tab')
-  await expect(page.getByRole('button', { name: 'Import JSON' })).toBeFocused()
+  await expect(page.locator('.preferences-trigger')).toBeFocused()
   await expect(page.locator('.preview-frame')).toHaveCSS(
     'animation-name',
     'none',
@@ -434,9 +456,10 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
     ).violations,
   ).toEqual([])
 
+  await page.getByRole('button', { name: 'Show preview' }).click()
   for (const width of [1440, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
-    if (width <= 730) {
+    if (width < 860) {
       await page.getByRole('button', { name: 'Editor', exact: true }).click()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
@@ -450,7 +473,7 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(width)
     const phone = page.getByRole('button', { name: 'Phone preview' })
-    if (width > 730) {
+    if (width >= 860) {
       expect((await phone.boundingBox())?.height).toBeGreaterThanOrEqual(44)
       await phone.click()
       await expect(page.locator('.preview-frame')).toHaveAttribute(
@@ -474,6 +497,10 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
       })
     }
   }
+  await page.locator('.preferences-trigger').click()
+  await page.getByLabel('Editor language').click({ trial: true })
+  await page.locator('.brand').click()
+  await expect(page.locator('.preferences-popover')).toBeHidden()
   await page.getByRole('button', { name: 'Editor', exact: true }).click()
   const largeText = await page.addStyleTag({
     content: 'html { font-size: 200%; }',
@@ -541,4 +568,213 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
         .analyze()
     ).violations,
   ).toEqual([])
+})
+
+test('localizes the workspace and preview without changing profile content', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['uk-UA', 'es-MX', 'en'],
+    })
+  })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('/')
+  const locale = page.locator('#editor-language')
+  const theme = page.locator('#editor-theme')
+  const editorSettings = page.locator('.preferences-trigger')
+  const preferences = page.locator('.preferences-popover')
+  const activeTheme = theme.locator('[aria-pressed="true"]')
+  await page.locator('.preview-toggle').click()
+  await expect(
+    page.getByRole('heading', { name: 'Editar perfil' }),
+  ).toBeVisible()
+  await expect(page.locator('.public-profile h1')).toHaveText('Tu nombre')
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light dark')
+  await expect(page.locator('.public-profile')).toHaveAttribute(
+    'data-variant',
+    'light',
+  )
+  await editorSettings.press('Enter')
+  await expect(preferences).toBeVisible()
+  await page.keyboard.press('Tab')
+  await expect(locale).toBeFocused()
+  await expect(locale).toHaveValue('es')
+  await expect(activeTheme).toHaveAttribute('data-theme', 'system')
+  await theme.locator('[data-theme="light"]').click()
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light')
+  await page.keyboard.press('Escape')
+  await expect(preferences).toBeHidden()
+  await expect(editorSettings).toBeFocused()
+  await page.getByLabel('Nombre visible').fill('Mira · ミラ')
+  await page.getByLabel('Idioma de la página').fill('ja')
+  await expect(page.getByText('Guardado localmente')).toBeVisible()
+
+  await editorSettings.click()
+  const credit = page.locator('.profile-footer')
+  for (const [value, name, label] of [
+    ['en', 'English', 'Made with Rvnce'],
+    ['ru', 'Русский', 'Сделано в Rvnce'],
+    ['es', 'Español', 'Hecho con Rvnce'],
+    ['pt-BR', 'Português (Brasil)', 'Feito com Rvnce'],
+    ['fr', 'Français', 'Créé avec Rvnce'],
+    ['de', 'Deutsch', 'Erstellt mit Rvnce'],
+  ]) {
+    await expect(locale.locator('option[value="' + value + '"]')).toHaveText(
+      name!,
+    )
+    await locale.selectOption(value!)
+    await expect(page.locator('html')).toHaveAttribute('lang', value!)
+    await expect(credit).toHaveText(label!)
+    await expect(page.locator('.public-profile')).toHaveAttribute('lang', 'ja')
+    await expect(page.locator('#profile-name')).toHaveValue('Mira · ミラ')
+  }
+  await theme.locator('[data-theme="dark"]').click()
+  await page.keyboard.press('Escape')
+  await page.locator('input[accept=".json,application/json"]').setInputFiles({
+    name: 'bad.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{'),
+  })
+  await expect(
+    page.getByText('Diese Datei enthält kein gültiges JSON.'),
+  ).toBeVisible()
+  await editorSettings.click()
+  await locale.selectOption('ru')
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('В файле некорректный JSON.')).toBeVisible()
+  await page.reload()
+  await editorSettings.click()
+  await expect(locale).toHaveValue('ru')
+  await expect(activeTheme).toHaveAttribute('data-theme', 'dark')
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark')
+  await page.keyboard.press('Escape')
+  await expect(page.getByLabel('Отображаемое имя')).toHaveValue('Mira · ミラ')
+  await expect(page.getByLabel('Язык страницы')).toHaveValue('ja')
+  await expect(page.locator('.public-profile')).toHaveAttribute(
+    'data-variant',
+    'light',
+  )
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([])
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await editorSettings.click()
+  await theme.locator('[data-theme="light"]').click()
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light')
+  await expect(page.locator('html')).not.toHaveClass(/theme-switching/u)
+})
+
+test('moves a floating preview and restores the mobile editing position', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/')
+  const preview = page.locator('#preview-pane')
+  await expect(preview).toBeHidden()
+  const settings = page.locator('.settings')
+  const sidebar = await page.locator('.editor-sidebar').boundingBox()
+  expect((await settings.boundingBox())!.x).toBeGreaterThanOrEqual(
+    sidebar!.width,
+  )
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await page.getByText('Typography', { exact: true }).click()
+  await page.getByText('Card and avatar', { exact: true }).click()
+  await page.getByRole('button', { name: 'Show preview' }).press('Enter')
+  await expect(preview).toBeVisible()
+  const grip = page.getByRole('button', { name: 'Move preview' })
+  await expect(grip).toBeFocused()
+  const initial = (await preview.boundingBox())!
+  await page.evaluate(() => window.scrollTo(0, 640))
+  await expect
+    .poll(async () => (await preview.boundingBox())?.y)
+    .toBe(initial.y)
+  const handle = (await grip.boundingBox())!
+  await page.mouse.move(
+    handle.x + handle.width / 2,
+    handle.y + handle.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    handle.x + handle.width / 2 - 130,
+    handle.y + handle.height / 2 - 60,
+    { steps: 5 },
+  )
+  await page.mouse.up()
+  await expect
+    .poll(async () => (await preview.boundingBox())?.x)
+    .toBeLessThan(initial.x - 100)
+  await grip.press('Home')
+  await expect
+    .poll(async () => (await preview.boundingBox())?.x)
+    .toBe(initial.x)
+  await grip.press('Escape')
+  await expect(preview).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Show preview' })).toBeFocused()
+
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.evaluate(() => window.scrollTo(0, 620))
+  const scroll = await page.evaluate(() => window.scrollY)
+  expect(scroll).toBeGreaterThan(450)
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(preview).toBeVisible()
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await page.getByRole('button', { name: 'Editor', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll)
+  await expect(page.getByText('Card and avatar', { exact: true })).toBeVisible()
+})
+
+test('keeps link operations responsive and disables motion on request', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    (raw) => localStorage.setItem('rvnce.draft.v1', raw),
+    JSON.stringify(demoProfile(null)),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Links', exact: true }).click()
+  const first = page.getByRole('button', { name: 'Move Rvnce on GitHub down' })
+  const animated = await first.evaluate(async (button) => {
+    button.click()
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    return Boolean(
+      document.querySelector('[data-link-row="link-1"]')?.getAnimations()
+        .length,
+    )
+  })
+  expect(animated).toBe(true)
+  await page
+    .getByRole('button', { name: 'Move Rvnce on GitHub up' })
+    .press('Enter')
+  await expect(page.locator('[data-link-row]').first()).toHaveAttribute(
+    'data-link-row',
+    'link-1',
+  )
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.getByRole('button', { name: 'Remove Rvnce on GitHub' }).click()
+  await expect(page.locator('[data-link-row]')).toHaveCount(2)
+  await expect(page.locator('.link-exit')).toHaveCount(0)
+  await expect(
+    page.getByRole('group', { name: 'Link 1' }).getByLabel('Label'),
+  ).toBeFocused()
+  expect(
+    await page
+      .locator('.editor-panel')
+      .evaluate(
+        (panel) =>
+          panel
+            .getAnimations({ subtree: true })
+            .filter(
+              (animation) =>
+                animation.effect instanceof KeyframeEffect &&
+                animation.effect
+                  .getKeyframes()
+                  .some((frame) => 'transform' in frame),
+            ).length,
+      ),
+  ).toBe(0)
 })

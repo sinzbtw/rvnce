@@ -12,7 +12,7 @@ flowchart LR
     DraftSession -->|"reads and writes revisions"| Draft
     Draft -->|"writes revision and media atomically"| Local[("IndexedDB")]
     Draft -->|"reads legacy drafts"| Legacy[("localStorage")]
-    Draft -->|"parses stored drafts"| Profile["Profile v3, Theme v1 and validation · profile/document.ts"]
+    Draft -->|"parses stored drafts"| Profile["Profile v4, Theme v1 and validation · profile/document.ts"]
     Editor -->|"checks fields and validates exports"| Profile
     Editor -->|"imports, normalizes images, and downloads"| Files["Browser file I/O · editor/files.ts"]
     Files -->|"validates imported profiles and themes"| Profile
@@ -28,10 +28,11 @@ flowchart LR
 
 ## Boundaries
 
-- **Profile and theme.** [ProfileDocument](src/profile/document.ts) v3 contains
-  profile details, ordered links, appearance and optional credit. A theme v1
-  file carries only appearance and its background. Profile v1 and v2 migrate
-  to Graphic with the original palette, accent and disabled credit. Draft
+- **Profile and theme.** [ProfileDocument](src/profile/document.ts) v4 contains
+  profile details, ordered links, appearance, an optional credit and a browser
+  tab icon. A theme v1 file carries only appearance and its background. Profile
+  v1 and v2 migrate to Graphic with the original palette, accent and disabled
+  credit. Profile v3 preserves its branding with an empty tab icon. Draft
   validation allows incomplete content. ZIP export validates a complete profile.
 - **Editor.** [Editor](src/editor/Editor.tsx) owns the draft, preview and asset
   URLs. Browser file I/O validates and decodes imports before applying them.

@@ -10,9 +10,10 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const dev = process.argv.includes('--dev')
 const output = join(root, dev ? '.cache/dev-public' : 'dist')
 
-const [avatar, css] = await Promise.all([
+const [avatar, css, favicon] = await Promise.all([
   readFile(join(root, 'src/assets/mira-park.png')),
   readFile(join(root, 'src/public/profile.css'), 'utf8'),
+  readFile(join(root, 'src/assets/rvnce-mark.png')),
 ])
 
 async function loadFont(family: FontName) {
@@ -41,7 +42,7 @@ await Promise.all(
     const graphic = example.preset === 'graphic'
     const doc = demoProfile(graphic ? avatar.toString('base64') : null, example)
     const font = fonts.get(doc.appearance.typography.font)!
-    const files = siteFiles(doc, { css, ...font })
+    const files = siteFiles(doc, { css, favicon, ...font })
     await Promise.all(
       Object.entries(files).map(async ([name, content]) => {
         const target = join(output, 'demo', graphic ? '' : example.preset, name)
@@ -54,14 +55,18 @@ await Promise.all(
 
 if (!dev) {
   await writeFile(join(output, '.nojekyll'), '')
-  await Promise.all(
-    fontNames.map((family) =>
+  const motionLicense = await readFile(
+    join(root, 'node_modules/motion/LICENSE.md'),
+  )
+  await Promise.all([
+    writeFile(join(output, 'assets', 'motion-LICENSE.txt'), motionLicense),
+    ...fontNames.map((family) =>
       writeFile(
         join(output, 'assets', family + '-OFL.txt'),
         fonts.get(family)!.fontLicense,
       ),
     ),
-  )
+  ])
   const bundles = (await readdir(join(output, 'assets'))).filter((name) =>
     /\.(js|css)$/u.test(name),
   )

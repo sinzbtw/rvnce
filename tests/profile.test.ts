@@ -46,7 +46,7 @@ describe('Rvnce profile documents', () => {
   it('rejects broken JSON, unsupported versions, oversized payloads, and unknown keys', () => {
     expect(() => parseProfile('{')).toThrow('valid JSON')
     expect(() =>
-      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 4 })),
+      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 5 })),
     ).toThrow('unsupported')
     expect(() => parseProfile('x'.repeat(limits.documentBytes + 1))).toThrow(
       'smaller',
@@ -99,7 +99,7 @@ describe('Rvnce profile documents', () => {
     const raw = JSON.stringify(legacy)
     expect(() => parseProfile(raw, 'draft')).toThrow('profile details')
     expect(parseProfile(raw, 'recover')).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       profile: { name: 'Mira', bio: 'First\nSecond', language: 'en' },
       branding: { showMadeWithRvnce: false },
     })
@@ -125,7 +125,7 @@ describe('Rvnce profile documents', () => {
     }
     const doc = parseProfile(JSON.stringify(legacy))
     expect(doc).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       profile: { language: 'ru' },
       appearance: {
         preset: 'graphic',
@@ -138,6 +138,38 @@ describe('Rvnce profile documents', () => {
     expect(siteFiles(doc, emptyAssets)['index.html']).not.toContain(
       'Made with Rvnce',
     )
+  })
+
+  it('migrates v3 branding and validates a standalone favicon in v4', () => {
+    const doc = demoProfile(null)
+    const previous = {
+      ...doc,
+      schemaVersion: 3,
+      branding: { showMadeWithRvnce: true },
+    }
+    expect(parseProfile(JSON.stringify(previous))).toEqual(doc)
+    expect(siteFiles(doc, emptyAssets)['favicon.png']).toBeUndefined()
+
+    const icon = readFileSync(
+      new URL('../src/assets/rvnce-mark.png', import.meta.url),
+    )
+    doc.branding.favicon = icon.toString('base64')
+    const profile = parseProfile(JSON.stringify(doc))
+    const files = siteFiles(profile, emptyAssets)
+    expect(files['favicon.png']).toEqual(new Uint8Array(icon))
+    expect(files['index.html']).toContain(
+      'rel="icon" type="image/png" href="./favicon.png"',
+    )
+    expect(files['avatar.png']).toBeUndefined()
+
+    const wrongSize = Buffer.from(icon)
+    wrongSize.writeUInt32BE(32, 16)
+    doc.branding.favicon = wrongSize.toString('base64')
+    expect(() => parseProfile(JSON.stringify(doc))).toThrow('64 × 64')
+    doc.branding.favicon = samplePng.toString('base64')
+    expect(() => parseProfile(JSON.stringify(doc))).toThrow('supported PNG')
+    doc.branding.favicon = btoa('not a PNG')
+    expect(() => parseProfile(JSON.stringify(doc))).toThrow('supported PNG')
   })
 
   it.each(presetNames)(

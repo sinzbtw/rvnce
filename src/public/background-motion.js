@@ -20,7 +20,9 @@
         let generation = 0
 
         const update = () => {
-          button.textContent = requested ? 'Stop background' : 'Play background'
+          button.textContent = requested
+            ? (button.dataset.stopLabel ?? 'Stop background')
+            : (button.dataset.playLabel ?? 'Play background')
           button.hidden = failed
         }
         const stop = () => {
@@ -68,6 +70,12 @@
         image?.addEventListener('load', loaded)
         button.addEventListener('click', click)
         preference.addEventListener('change', preferenceChanged)
+        const labels = button.hasAttribute('data-play-label')
+          ? new MutationObserver(update)
+          : null
+        labels?.observe(button, {
+          attributeFilter: ['data-play-label', 'data-stop-label'],
+        })
         update()
         if (!preference.matches) void play()
 
@@ -77,6 +85,7 @@
           image?.removeEventListener('load', loaded)
           button.removeEventListener('click', click)
           preference.removeEventListener('change', preferenceChanged)
+          labels?.disconnect()
           media.removeAttribute('src')
           video?.load()
         }

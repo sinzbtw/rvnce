@@ -1,6 +1,7 @@
 import { renderToString } from 'preact-render-to-string'
 import {
   avatarBytes,
+  faviconBytes,
   profileLanguage,
   type ProfileDocument,
 } from '../profile/document'
@@ -26,6 +27,7 @@ interface SiteAssets {
   fontLicense: Uint8Array
   motionScript?: string | undefined
   avatar?: Uint8Array | undefined
+  favicon?: Uint8Array | undefined
 }
 
 export function siteFiles(
@@ -35,6 +37,9 @@ export function siteFiles(
   const { appearance, profile } = doc
   const avatar =
     assets.avatar ?? (profile.avatar && avatarBytes(profile.avatar))
+  const favicon =
+    assets.favicon ??
+    (doc.branding.favicon && faviconBytes(doc.branding.favicon))
   const media = appearance.background.media
   const filename = media && backgroundFilename(media)
   const motion = media && 'poster' in media
@@ -60,6 +65,7 @@ export function siteFiles(
         <meta name="referrer" content="no-referrer" />
         <meta name="description" content={profile.bio.trim()} />
         <title>{profile.name.trim()}</title>
+        {favicon && <link rel="icon" type="image/png" href="./favicon.png" />}
         <link rel="stylesheet" href="./profile.css" />
         {motion && <script src="./background-motion.js" defer />}
       </head>
@@ -102,6 +108,7 @@ export function siteFiles(
     ),
     'fonts/OFL.txt': assets.fontLicense,
     ...(avatar ? { 'avatar.png': avatar } : {}),
+    ...(favicon ? { 'favicon.png': favicon } : {}),
     ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),
     ...(motion
       ? {

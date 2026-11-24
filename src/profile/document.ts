@@ -17,6 +17,8 @@ export const limits = {
   blocks: 24,
   avatarEdge: 384,
   avatarBytes: 768 * 1024,
+  faviconEdge: 64,
+  faviconBytes: 24 * 1024,
   uploadBytes: 4 * 1024 * 1024,
   uploadPixels: 24_000_000,
   uploadEdge: 8192,
@@ -31,7 +33,7 @@ export interface LinkBlock {
 }
 
 export interface ProfileDocument {
-  schemaVersion: 3
+  schemaVersion: 4
   profile: {
     name: string
     bio: string
@@ -39,7 +41,7 @@ export interface ProfileDocument {
     language: string
   }
   appearance: Appearance
-  branding: { showMadeWithRvnce: boolean }
+  branding: { showMadeWithRvnce: boolean; favicon: string | null }
   blocks: LinkBlock[]
 }
 
@@ -86,13 +88,19 @@ export function validUrl(input: string): boolean {
   }
 }
 
-function validateAvatar(encoded: string): void {
+function validatePng(encoded: string, kind: 'avatar' | 'favicon'): void {
+  const favicon = kind === 'favicon'
+  const byteLimit = favicon ? limits.faviconBytes : limits.avatarBytes
+  const edge = favicon ? limits.faviconEdge : limits.avatarEdge
+  const invalid = favicon
+    ? 'The favicon is not a supported PNG.'
+    : 'The avatar is not a supported PNG.'
   if (
-    encoded.length > Math.ceil(limits.avatarBytes / 3) * 4 ||
+    encoded.length > Math.ceil(byteLimit / 3) * 4 ||
     !/^[A-Za-z0-9+/]+={0,2}$/u.test(encoded) ||
     encoded.length % 4 !== 0
   ) {
-    throw new Error('The avatar is not a supported PNG.')
+    throw new Error(invalid)
   }
   const padding = encoded.endsWith('==') ? 2 : Number(encoded.endsWith('='))
   const length = (encoded.length / 4) * 3 - padding
@@ -104,10 +112,10 @@ function validateAvatar(encoded: string): void {
   ]
   if (
     length < 45 ||
-    length > limits.avatarBytes ||
+    length > byteLimit ||
     signature.some((byte, i) => headerBytes[i] !== byte)
   ) {
-    throw new Error('The avatar is not a supported PNG.')
+    throw new Error(invalid)
   }
   const header = new DataView(headerBytes.buffer)
   const width = header.getUint32(16)
@@ -115,15 +123,25 @@ function validateAvatar(encoded: string): void {
   if (
     !width ||
     !height ||
-    width > limits.avatarEdge ||
-    height > limits.avatarEdge
+    width > edge ||
+    height > edge ||
+    (favicon && (width !== edge || height !== edge))
   ) {
-    throw new Error('The avatar must fit within 384 × 384 pixels.')
+    throw new Error(
+      favicon
+        ? 'The favicon must be 64 × 64 pixels.'
+        : 'The avatar must fit within 384 × 384 pixels.',
+    )
   }
 }
 
 export function avatarBytes(encoded: string): Uint8Array<ArrayBuffer> {
-  validateAvatar(encoded)
+  validatePng(encoded, 'avatar')
+  return Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
+}
+
+export function faviconBytes(encoded: string): Uint8Array<ArrayBuffer> {
+  validatePng(encoded, 'favicon')
   return Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
 }
 
@@ -133,11 +151,14 @@ export function profileIssues(doc: ProfileDocument) {
     language: profileLanguage(doc.profile.language)
       ? ''
       : 'Enter a language tag, such as en or ru.',
-    blocks: doc.blocks.map((block) => ({
-      label: block.label.trim() ? '' : 'Enter a link label.',
-      url: validUrl(block.url) ? '' : 'Enter a full HTTP or HTTPS URL.',
-    })),
-  }
+    blocks: doc.blocks.map(
+      (block) =>
+        ({
+          label: block.label.trim() ? '' : 'Enter a link label.',
+          url: validUrl(block.url) ? '' : 'Enter a full HTTP or HTTPS URL.',
+        }) as const,
+    ),
+  } as const
 }
 
 function readJson(raw: string): unknown {
@@ -186,13 +207,14 @@ export function validateProfile(
     !record(value) ||
     (value.schemaVersion !== 1 &&
       value.schemaVersion !== 2 &&
-      value.schemaVersion !== 3)
+      value.schemaVersion !== 3 &&
+      value.schemaVersion !== 4)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
   }
   const version = value.schemaVersion
   const keys = ['schemaVersion', 'profile', 'appearance', 'blocks']
-  if (version === 3) keys.push('branding')
+  if (version >= 3) keys.push('branding')
   if (!hasKeys(value, keys)) {
     throw new Error('This file does not match the Rvnce profile format.')
   }
@@ -218,18 +240,28 @@ export function validateProfile(
   ) {
     throw new Error('The profile details are invalid.')
   }
-  if (profile.avatar !== null) validateAvatar(profile.avatar)
+  if (profile.avatar !== null) validatePng(profile.avatar, 'avatar')
   let parsedAppearance: Appearance
   let showMadeWithRvnce = false
-  if (version === 3) {
+  let favicon: string | null = null
+  if (version >= 3) {
     parsedAppearance = parseAppearance(appearance)
+    const brandingKeys =
+      version === 4 ? ['showMadeWithRvnce', 'favicon'] : ['showMadeWithRvnce']
     if (
-      !hasKeys(value.branding, ['showMadeWithRvnce']) ||
+      !hasKeys(value.branding, brandingKeys) ||
       typeof value.branding.showMadeWithRvnce !== 'boolean'
     ) {
       throw new Error('The profile branding is invalid.')
     }
     showMadeWithRvnce = value.branding.showMadeWithRvnce
+    if (version === 4 && value.branding.favicon !== null) {
+      if (typeof value.branding.favicon !== 'string') {
+        throw new Error('The profile branding is invalid.')
+      }
+      favicon = value.branding.favicon
+      validatePng(favicon, 'favicon')
+    }
   } else {
     if (
       !hasKeys(appearance, ['theme', 'variant', 'accent']) ||
@@ -271,10 +303,10 @@ export function validateProfile(
     return { id: block.id, type: 'link', label, url }
   })
   const doc: ProfileDocument = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     profile: { name, bio, avatar: profile.avatar, language },
     appearance: parsedAppearance,
-    branding: { showMadeWithRvnce },
+    branding: { showMadeWithRvnce, favicon },
     blocks: parsedBlocks,
   }
   if (mode === 'publish') {

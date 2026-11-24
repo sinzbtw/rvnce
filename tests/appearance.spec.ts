@@ -75,6 +75,7 @@ test('keeps branding independent of portable themes and restores the full draft'
   page,
 }) => {
   await page.goto('/')
+  await page.getByRole('button', { name: 'Show preview' }).click()
   const preview = page.locator('.public-profile')
   const credit = preview.getByText('Made with Rvnce', { exact: true })
   await expect(preview).toHaveAttribute('data-preset', 'minimal')
@@ -95,6 +96,7 @@ test('keeps branding independent of portable themes and restores the full draft'
   await expect(preview.locator('.profile-backdrop img')).toBeVisible()
   await expect(page.getByText('Saved locally')).toBeVisible()
   await page.reload()
+  await page.getByRole('button', { name: 'Show preview' }).click()
   await expect(preview.locator('.profile-backdrop img')).toBeVisible()
   await expect(page.getByLabel('Show Made with Rvnce')).not.toBeChecked()
   await page.getByRole('button', { name: 'Appearance' }).click()
@@ -160,6 +162,7 @@ for (const extension of ['gif', 'mp4'] as const) {
     async ({ page, browser }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await page.goto('/')
+      await page.getByRole('button', { name: 'Show preview' }).click()
       await page.getByLabel('Display name').fill('Signal Garden')
       await page.getByRole('button', { name: 'Appearance' }).click()
       const original = await readFile(files[extension])

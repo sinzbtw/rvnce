@@ -12,6 +12,15 @@ export interface ProfileAssets {
   posterUrl?: string | undefined
 }
 
+interface PreviewLabels {
+  locale: string
+  name: string
+  links: string
+  credit: string
+  playBackground: string
+  stopBackground: string
+}
+
 function initials(name: string): string {
   return name
     .trim()
@@ -26,16 +35,21 @@ export function PublicProfile({
   doc,
   assets,
   preview = false,
+  previewLabels,
 }: {
   doc: ProfileDocument
   assets: ProfileAssets
   preview?: boolean
+  previewLabels?: PreviewLabels
 }) {
   const { profile, appearance, blocks } = doc
   const { avatarUrl, backgroundUrl, posterUrl } = assets
   const media = appearance.background.media
   const motion = media && 'poster' in media && backgroundUrl && posterUrl
-  const name = profile.name.trim() || 'Your name'
+  const enteredName = profile.name.trim()
+  const name = enteredName || previewLabels?.name || 'Your name'
+  const language = profileLanguage(profile.language)
+  const previewLocale = previewLabels?.locale
 
   return (
     <article
@@ -49,7 +63,7 @@ export function PublicProfile({
       data-align={appearance.typography.align}
       data-entrance={String(appearance.entrance)}
       style={preview ? profileVariables(appearance) : undefined}
-      lang={profileLanguage(profile.language)}
+      lang={language}
       dir="auto"
     >
       {motion &&
@@ -78,10 +92,12 @@ export function PublicProfile({
             class="background-control"
             type="button"
             hidden
-            lang="en"
+            lang={previewLocale ?? 'en'}
             dir="ltr"
+            data-play-label={previewLabels?.playBackground}
+            data-stop-label={previewLabels?.stopBackground}
           >
-            Play background
+            {previewLabels?.playBackground ?? 'Play background'}
           </button>,
         )}
       {!motion && backgroundUrl && (
@@ -91,7 +107,12 @@ export function PublicProfile({
       )}
       <div class="profile-card">
         <header class="profile-intro">
-          <h1 class="profile-name">{name}</h1>
+          <h1
+            class="profile-name"
+            lang={enteredName ? undefined : previewLocale}
+          >
+            {name}
+          </h1>
           <div class="profile-portrait">
             {avatarUrl ? (
               <img src={avatarUrl} width="384" height="384" alt="" />
@@ -104,7 +125,12 @@ export function PublicProfile({
           )}
         </header>
         {blocks.length > 0 && (
-          <ul class="profile-links" aria-label="Profile links" role="list">
+          <ul
+            class="profile-links"
+            aria-label={previewLabels?.links ?? 'Profile links'}
+            lang={previewLocale}
+            role="list"
+          >
             {blocks.map((block) => {
               const content = (
                 <>
@@ -127,7 +153,7 @@ export function PublicProfile({
                 </>
               )
               return (
-                <li key={block.id}>
+                <li key={block.id} lang={previewLocale ? language : undefined}>
                   {preview ? (
                     <span class="profile-link">{content}</span>
                   ) : (
@@ -146,9 +172,9 @@ export function PublicProfile({
         )}
       </div>
       {doc.branding.showMadeWithRvnce && (
-        <footer class="profile-footer" lang="en" dir="ltr">
+        <footer class="profile-footer" lang={previewLocale ?? 'en'} dir="ltr">
           {preview ? (
-            <span>Made with Rvnce</span>
+            <span>{previewLabels?.credit ?? 'Made with Rvnce'}</span>
           ) : (
             <a href={officialEditor} rel="noreferrer">
               Made with Rvnce
