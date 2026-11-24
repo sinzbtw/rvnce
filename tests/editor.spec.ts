@@ -739,7 +739,7 @@ test('keeps link operations responsive and disables motion on request', async ({
   await page.getByRole('button', { name: 'Links', exact: true }).click()
   const first = page.getByRole('button', { name: 'Move Rvnce on GitHub down' })
   const animated = await first.evaluate(async (button) => {
-    button.click()
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await new Promise((resolve) => requestAnimationFrame(resolve))
     return Boolean(
       document.querySelector('[data-link-row="link-1"]')?.getAnimations()
