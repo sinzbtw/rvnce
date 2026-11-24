@@ -7,14 +7,15 @@ or where a component writes its output.
 ```mermaid
 flowchart LR
     Entry["Browser entry · main.tsx"] -->|"loads draft"| Draft["Draft storage · editor/storage.ts"]
-    Entry -->|"mounts with draft or sample"| Editor["Profile editor · editor/Editor.tsx"]
+    Entry -->|"mounts with draft or new profile"| Editor["Profile editor · editor/Editor.tsx"]
     Editor -->|"tracks edits, saves, and resolves conflicts"| DraftSession["Draft state · editor/useDraft.ts"]
     DraftSession -->|"reads and writes revisions"| Draft
-    Draft -->|"reads and writes"| Local[("Browser localStorage")]
-    Draft -->|"parses stored drafts"| Profile["ProfileDocument v2 and validation · profile/document.ts"]
+    Draft -->|"writes revision and media atomically"| Local[("IndexedDB")]
+    Draft -->|"reads legacy drafts"| Legacy[("localStorage")]
+    Draft -->|"parses stored drafts"| Profile["Profile v3, Theme v1 and validation · profile/document.ts"]
     Editor -->|"checks fields and validates exports"| Profile
     Editor -->|"imports, normalizes images, and downloads"| Files["Browser file I/O · editor/files.ts"]
-    Files -->|"validates imported profiles"| Profile
+    Files -->|"validates imported profiles and themes"| Profile
     Editor -->|"renders live preview"| Render["PublicProfile · public/PublicProfile.tsx"]
     Editor -->|"loads ZIP exporter on demand"| Zip["Browser ZIP exporter · editor/site-download.ts"]
     Zip -->|"generates site files"| Site["siteFiles · export/site.tsx"]
@@ -27,24 +28,22 @@ flowchart LR
 
 ## Boundaries
 
-- **Profile and draft.** [ProfileDocument](src/profile/document.ts) defines
-  schema version 2, including profile details, page language, appearance, and
-  ordered link blocks. Version 1 profiles are upgraded with the language
-  `en`. JSON backup, import, and browser storage use draft validation so
-  incomplete fields can be restored. ZIP export validates the complete profile.
-- **Editor.** [Editor](src/editor/Editor.tsx) owns the draft and preview state.
-  [Browser file I/O](src/editor/files.ts) validates imported JSON and decodes
-  its avatar before the editor prompts for confirmation. A confirmed import
-  replaces the draft through the same save path as ordinary edits. The
-  [draft state](src/editor/useDraft.ts) batches saves and pauses writes when
-  the stored revision changes. The live preview omits incomplete links and
-  displays complete links as static content.
-- **Public page.** [PublicProfile](src/public/PublicProfile.tsx) renders the
-  supplied profile and avatar URL. [siteFiles](src/export/site.tsx) uses that
-  component to produce HTML, CSS, and local assets with relative paths. The
-  browser [ZIP exporter](src/editor/site-download.ts) re-encodes the avatar and packages those files, and
-  the [demo build](scripts/build-demo.ts) writes the same file layout to a
-  directory. Published profile pages run without JavaScript.
+- **Profile and theme.** [ProfileDocument](src/profile/document.ts) v3 contains
+  profile details, ordered links, appearance and optional credit. A theme v1
+  file carries only appearance and its background. Profile v1 and v2 migrate
+  to Graphic with the original palette, accent and disabled credit. Draft
+  validation allows incomplete content. ZIP export validates a complete profile.
+- **Editor.** [Editor](src/editor/Editor.tsx) owns the draft, preview and asset
+  URLs. Browser file I/O validates and decodes imports before applying them.
+  IndexedDB writes the draft revision and updated media atomically.
+  BroadcastChannel reports changes to other editors, and each write checks
+  the stored revision. The legacy localStorage value can still be recovered.
+- **Public page.** [PublicProfile](src/public/PublicProfile.tsx) renders a
+  validated profile with supplied asset URLs. [siteFiles](src/export/site.tsx)
+  uses the same renderer and CSS variables to generate HTML, CSS and relative
+  assets for demos and ZIP exports. Motion backgrounds carry a local
+  playback script and a poster. All profile content remains available with
+  scripting disabled.
 
 ## Local code graph
 

@@ -3,22 +3,27 @@ import { describe, expect, it } from 'vitest'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { siteFiles } from '../src/export/site'
 import { demoProfile } from '../src/profile/demo'
+import { presetAppearance, presetNames } from '../src/profile/appearance'
 import {
   editableText,
   limits,
   parseProfile,
+  parseTheme,
   validUrl,
 } from '../src/profile/document'
-import { checkImageSize } from '../src/editor/image-size'
-import { accentInk } from '../src/public/colors'
+import { checkImageSize } from '../src/profile/image-size'
+import { accentInk } from '../src/profile/colors'
 
 const samplePng = readFileSync(
   new URL('../src/assets/mira-park.png', import.meta.url),
 )
 const emptyAssets = {
   css: '.public-profile{display:block}',
-  latinFont: new Uint8Array(),
-  cyrillicFont: new Uint8Array(),
+  fontCss: '@font-face{src:url(./files/manrope-latin-wght-normal.woff2)}',
+  fonts: {
+    'manrope-latin-wght-normal.woff2': new Uint8Array(),
+    'manrope-cyrillic-wght-normal.woff2': new Uint8Array(),
+  },
   fontLicense: new Uint8Array(),
 }
 
@@ -41,7 +46,7 @@ describe('Rvnce profile documents', () => {
   it('rejects broken JSON, unsupported versions, oversized payloads, and unknown keys', () => {
     expect(() => parseProfile('{')).toThrow('valid JSON')
     expect(() =>
-      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 3 })),
+      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 4 })),
     ).toThrow('unsupported')
     expect(() => parseProfile('x'.repeat(limits.documentBytes + 1))).toThrow(
       'smaller',
@@ -86,15 +91,17 @@ describe('Rvnce profile documents', () => {
 
   it('upgrades legacy documents and recovers text written by older editors', () => {
     const legacy = {
-      ...demoProfile(null),
       schemaVersion: 1,
       profile: { name: 'Mira', bio: 'First\fSecond', avatar: null },
+      appearance: { theme: 'rvnce', variant: 'light', accent: '#4434d4' },
+      blocks: [],
     }
     const raw = JSON.stringify(legacy)
     expect(() => parseProfile(raw, 'draft')).toThrow('profile details')
     expect(parseProfile(raw, 'recover')).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       profile: { name: 'Mira', bio: 'First\nSecond', language: 'en' },
+      branding: { showMadeWithRvnce: false },
     })
     expect(editableText('First\fSecond', true)).toBe('First\nSecond')
     legacy.profile.bio = 'Valid legacy bio'
@@ -107,6 +114,64 @@ describe('Rvnce profile documents', () => {
     const raw = JSON.stringify(doc)
     expect(parseProfile(raw, 'draft')).toEqual(doc)
     expect(() => parseProfile(raw)).toThrow('language tag')
+  })
+
+  it('migrates a v2 profile without the credit and preserves its graphic palette', () => {
+    const legacy = {
+      schemaVersion: 2,
+      profile: { name: 'Legacy', bio: '', avatar: null, language: 'ru' },
+      appearance: { theme: 'rvnce', variant: 'dark', accent: '#efaa3c' },
+      blocks: [],
+    }
+    const doc = parseProfile(JSON.stringify(legacy))
+    expect(doc).toMatchObject({
+      schemaVersion: 3,
+      profile: { language: 'ru' },
+      appearance: {
+        preset: 'graphic',
+        variant: 'dark',
+        accent: '#efaa3c',
+        links: { style: 'graphic', color: '#efaa3c', text: '#000000' },
+      },
+      branding: { showMadeWithRvnce: false },
+    })
+    expect(siteFiles(doc, emptyAssets)['index.html']).not.toContain(
+      'Made with Rvnce',
+    )
+  })
+
+  it.each(presetNames)(
+    'round-trips %s as a theme with independent settings',
+    (name) => {
+      const appearance = presetAppearance(name)
+      const theme = { type: 'rvnce-theme', schemaVersion: 1, appearance }
+      expect(parseTheme(JSON.stringify(theme))).toEqual(theme)
+      appearance.card.radius = 45
+      expect(presetAppearance(name).card.radius).not.toBe(45)
+    },
+  )
+
+  it.each([
+    { background: { color: '#000000;position:fixed' } },
+    { background: { scale: 200 } },
+    { background: { kind: 'media' } },
+    { typography: { font: 'url(test)' } },
+    { card: { opacity: -1 } },
+    { avatar: { shape: 'polygon' } },
+    { links: { gap: 3.5 } },
+  ])('rejects unsafe or out-of-range theme overrides %j', (override) => {
+    const appearance = presetAppearance('minimal')
+    const [group, edits] = Object.entries(override)[0]!
+    const base = appearance[group as keyof typeof appearance] as object
+    expect(() =>
+      parseTheme(
+        JSON.stringify({
+          type: 'rvnce-theme',
+          schemaVersion: 1,
+          appearance: { ...appearance, [group]: { ...base, ...edits } },
+        }),
+      ),
+    ).toThrow()
   })
 
   it('chooses legible ink on dark, light and midtone accents', () => {
@@ -152,6 +217,8 @@ describe('standalone public site', () => {
     expect(html).toContain('href="./profile.css"')
     expect(html).toContain('src="./avatar.png"')
     expect(html).not.toContain('<script')
+    expect(html).toContain('href="https://sinzbtw.github.io/rvnce/"')
+    expect(html).toContain('Made with Rvnce')
     expect(strFromU8(unpacked['profile.css']!)).toContain(
       './fonts/manrope-latin.woff2',
     )
@@ -161,7 +228,7 @@ describe('standalone public site', () => {
   it('omits an absent avatar and renders initials', () => {
     const files = siteFiles(demoProfile(null), emptyAssets)
     expect(files['avatar.png']).toBeUndefined()
-    expect(files['index.html']).toContain('>MP</span>')
+    expect(files['index.html']).toContain('>S</span>')
   })
 })
 

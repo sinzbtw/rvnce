@@ -10,7 +10,11 @@ The latest published version and `main` are supported.
 
 ## Current trust model
 
-Rvnce stores one draft in the browser and validates imported JSON before applying it. Published links are limited to HTTP(S). Profile text is rendered as text. Avatar uploads have file size and pixel limits, are decoded as raster images, and are resized and encoded as PNG. ZIP export re-encodes the avatar, removing source metadata. A JSON backup can retain the PNG bytes from an imported draft. The standalone HTML includes a content security policy and uses local CSS, fonts, and images. Site visitors connect to a link's destination when they follow that link.
+Rvnce stores one draft in IndexedDB and validates versioned profile and theme JSON before applying it. Published links are limited to HTTP(S). Profile text is rendered as text and appearance values use bounded numbers, enumerations, and hexadecimal colors. Resource paths are assigned by the exporter.
+
+Uploaded avatars and still backgrounds have byte and pixel limits and are re-encoded. ZIP export re-encodes the avatar, removing source metadata. GIF and H.264 MP4 backgrounds keep their original bytes, including metadata or embedded audio. Their playback is muted. The editor checks format, dimensions, and size before decoding a supported background.
+
+The standalone HTML includes a content security policy and uses local CSS, fonts, and media. Motion backgrounds allow a local playback script. Site visitors connect to an external destination when they follow a link. The optional Rvnce credit uses a plain link and sends no requests until clicked.
 
 Drafts are stored per browser origin. Anyone with access to that browser profile can read the local draft. Downloaded JSON and ZIP files contain any personal content the author entered.
 

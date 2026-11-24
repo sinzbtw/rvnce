@@ -13,6 +13,12 @@ test('edits, restores, imports and exports a standalone profile', async ({
   page,
   browser,
 }) => {
+  await page.addInitScript(
+    (raw) => {
+      localStorage.setItem('rvnce.draft.v1', raw)
+    },
+    JSON.stringify(demoProfile(null)),
+  )
   await page.goto('/')
   await page.getByLabel('Display name').fill('Ира Moon')
   await page.getByLabel('Bio').fill('Studio notes & visual work.')
@@ -40,7 +46,9 @@ test('edits, restores, imports and exports a standalone profile', async ({
   await expect(page.locator('.public-profile a')).toHaveCount(0)
   await page.getByRole('button', { name: 'Appearance' }).click()
   await page.getByRole('radio', { name: 'Dark' }).check()
-  await page.getByRole('button', { name: 'Forest' }).click()
+  await page.getByText('Card and avatar', { exact: true }).click()
+  await page.getByLabel('Accent color', { exact: true }).fill('#176451')
+  await expect(page.getByText('Saved locally')).toBeVisible()
   await page.reload()
   await expect(page.getByLabel('Display name')).toHaveValue('Ира Moon')
   await expect(page.locator('.public-profile')).toHaveAttribute(
@@ -149,6 +157,7 @@ test('warns when storage is unavailable and keeps exports usable', async ({
     }
     Storage.prototype.getItem = blocked
     Storage.prototype.setItem = blocked
+    IDBFactory.prototype.open = blocked
   })
   await page.goto('/')
   const warning = page.getByText(
@@ -162,7 +171,7 @@ test('warns when storage is unavailable and keeps exports usable', async ({
   await page.getByRole('button', { name: 'Links', exact: true }).click()
   await page.getByRole('button', { name: 'Add link' }).click()
   await page
-    .getByRole('group', { name: 'Link 4' })
+    .getByRole('group', { name: 'Link 1' })
     .getByText('Enter a link label.')
     .waitFor()
   const download = page.waitForEvent('download')
@@ -174,22 +183,24 @@ test('warns when storage is unavailable and keeps exports usable', async ({
     .setInputFiles((await backup.path())!)
   await page.getByRole('button', { name: 'Replace profile' }).click()
   await page.getByRole('button', { name: 'Links', exact: true }).click()
-  await expect(page.getByRole('group', { name: 'Link 4' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Link 1' })).toBeVisible()
 })
 
 test('preserves incomplete edits and focuses the invalid field on export', async ({
   page,
 }) => {
   await page.goto('/')
+  await page.getByLabel('Display name').fill('Draft with a link')
   await page.getByRole('button', { name: 'Links', exact: true }).click()
   await page.getByRole('button', { name: 'Add link' }).click()
   await page
-    .getByRole('group', { name: 'Link 4' })
+    .getByRole('group', { name: 'Link 1' })
     .getByLabel('Label')
     .fill('New destination')
+  await expect(page.getByText('Saved locally')).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: 'Download site' }).click()
-  const invalidLink = page.getByRole('group', { name: 'Link 4' })
+  const invalidLink = page.getByRole('group', { name: 'Link 1' })
   await expect(invalidLink.getByLabel('Label')).toHaveValue('New destination')
   await expect(invalidLink.getByLabel('URL')).toBeFocused()
   await expect(
@@ -202,10 +213,10 @@ test('protects edits across tabs and offers a copy of the conflicting draft', as
   context,
 }) => {
   await page.goto('/')
-  await expect(page.getByLabel('Display name')).toHaveValue('Mira Park')
+  await expect(page.getByLabel('Display name')).toHaveValue('')
   const second = await context.newPage()
   await second.goto('/')
-  await expect(second.getByLabel('Display name')).toHaveValue('Mira Park')
+  await expect(second.getByLabel('Display name')).toHaveValue('')
 
   await page.getByLabel('Display name').fill('Saved in the first tab')
   await expect(page.getByText('Saved locally')).toBeVisible()
@@ -229,9 +240,7 @@ test('protects edits across tabs and offers a copy of the conflicting draft', as
   await expect(second.getByLabel('Display name')).toHaveValue(
     'Saved in the first tab',
   )
-  await expect(second.getByLabel('Bio', { exact: true })).toHaveValue(
-    demoProfile(null).profile.bio,
-  )
+  await expect(second.getByLabel('Bio', { exact: true })).toHaveValue('')
   await second.getByLabel('Bio', { exact: true }).fill('Updated after loading')
   await expect(second.getByText('Saved locally')).toBeVisible()
   await page.reload()
@@ -247,9 +256,10 @@ test('recovers an old draft and preserves edited text with page breaks', async (
   page,
 }) => {
   const legacy = {
-    ...demoProfile(null),
     schemaVersion: 1,
     profile: { name: 'Recovered draft', bio: 'First\fSecond', avatar: null },
+    appearance: { theme: 'rvnce', variant: 'light', accent: '#4434d4' },
+    blocks: [],
   }
   await page.addInitScript((raw) => {
     if (localStorage.getItem('rvnce.draft.v1') === null)
@@ -343,25 +353,12 @@ test('ignores an older import that finishes after a newer selection', async ({
   await expect(page.getByLabel('Display name')).toHaveValue('Newer selection')
 })
 
-test('opens while the sample image loads, reports bad photos, and retries ZIP export', async ({
+test('opens an empty profile, reports bad photos, and retries ZIP export', async ({
   page,
 }) => {
-  let releaseSample!: () => void
-  const sample = new Promise<void>((resolve) => {
-    releaseSample = resolve
-  })
-  await page.route('**/mira-park-*.png', async (route) => {
-    await sample
-    await route.continue()
-  })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
-  try {
-    await expect(page.getByLabel('Display name')).toHaveValue('Mira Park')
-    await expect(page.locator('.profile-portrait img')).toHaveCount(0)
-  } finally {
-    releaseSample()
-  }
-  await expect(page.locator('.profile-portrait img')).toBeVisible()
+  await expect(page.getByLabel('Display name')).toHaveValue('')
+  await expect(page.locator('.profile-portrait img')).toHaveCount(0)
 
   const png = await readFile(avatarFixture)
   await page
@@ -487,10 +484,15 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
   await largeText.evaluate((style) => style.parentNode?.removeChild(style))
   await page.getByLabel('Display name').fill('ДлинноеИмя'.repeat(8))
   await page.getByRole('button', { name: 'Links', exact: true }).click()
+  await page.getByRole('button', { name: 'Add link' }).click()
   await page
     .getByRole('group', { name: 'Link 1' })
     .getByLabel('Label')
     .fill('X'.repeat(80))
+  await page
+    .getByRole('group', { name: 'Link 1' })
+    .getByLabel('URL')
+    .fill('https://example.org')
   await page.getByRole('button', { name: 'Appearance' }).click()
   await page.getByRole('radio', { name: 'Dark' }).check()
   await page.getByRole('button', { name: 'Preview', exact: true }).click()
@@ -509,14 +511,15 @@ test('checks keyboard, contrast, mobile layout, long content and reduced motion'
     ).violations,
   ).toEqual([])
 
+  await page.getByText('Examples', { exact: true }).click()
   const demoHref = await page
-    .getByRole('link', { name: 'View demo' })
+    .getByRole('link', { name: 'Graphic' })
     .getAttribute('href')
   expect(demoHref).toBe('./demo/index.html')
   await page.goto(new URL(demoHref!, page.url()).href)
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    await expect(page.getByRole('heading', { name: 'Mira Park' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'sinz' })).toBeVisible()
     await expect(page.locator('.profile-portrait img')).toHaveJSProperty(
       'naturalWidth',
       384,

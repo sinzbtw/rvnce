@@ -4,28 +4,27 @@ import {
   profileLanguage,
   type ProfileDocument,
 } from '../profile/document'
-import { accentInk } from '../public/colors'
+import { backgroundFilename, decodeBase64 } from '../profile/media'
+import { profileVariables } from '../public/appearance-css'
 import { PublicProfile } from '../public/PublicProfile'
 
-const latin =
-  'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
-const cyrillic = 'U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116'
+export function fontFiles(stylesheet: string): string[] {
+  return Array.from(
+    stylesheet.matchAll(/url\(\.\/files\/([a-z0-9-]+\.woff2)\)/gu),
+    (match) => match[1]!,
+  )
+}
 
-export function fontRules(latinUrl: string, cyrillicUrl: string): string {
-  const font = (url: string, range: string) =>
-    '@font-face{font-family:"Manrope Variable";font-style:normal;font-weight:200 800;font-display:swap;src:url("' +
-    url +
-    '") format("woff2");unicode-range:' +
-    range +
-    '}'
-  return font(latinUrl, latin) + '\n' + font(cyrillicUrl, cyrillic)
+function fontPath(name: string) {
+  return 'fonts/' + name.replace('-wght-normal.woff2', '.woff2')
 }
 
 interface SiteAssets {
   css: string
-  latinFont: Uint8Array
-  cyrillicFont: Uint8Array
+  fontCss: string
+  fonts: Record<string, Uint8Array>
   fontLicense: Uint8Array
+  motionScript?: string | undefined
   avatar?: Uint8Array | undefined
 }
 
@@ -33,36 +32,60 @@ export function siteFiles(
   doc: ProfileDocument,
   assets: SiteAssets,
 ): Record<string, string | Uint8Array> {
-  const { accent } = doc.appearance
+  const { appearance, profile } = doc
   const avatar =
-    assets.avatar ?? (doc.profile.avatar && avatarBytes(doc.profile.avatar))
+    assets.avatar ?? (profile.avatar && avatarBytes(profile.avatar))
+  const media = appearance.background.media
+  const filename = media && backgroundFilename(media)
+  const motion = media && 'poster' in media
+  if (motion && !assets.motionScript)
+    throw new Error('The background player could not be loaded.')
+  const csp = [
+    "default-src 'none'",
+    "style-src 'self'",
+    "img-src 'self'",
+    "font-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ]
+  if (motion) csp.push("script-src 'self'")
+  if (media?.type === 'video/mp4') csp.push("media-src 'self'")
+
   const html = renderToString(
-    <html lang={profileLanguage(doc.profile.language) ?? 'en'}>
+    <html lang={profileLanguage(profile.language) ?? 'en'}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta
-          http-equiv="Content-Security-Policy"
-          content="default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"
-        />
+        <meta http-equiv="Content-Security-Policy" content={csp.join('; ')} />
         <meta name="referrer" content="no-referrer" />
-        <meta name="description" content={doc.profile.bio.trim()} />
-        <title>{doc.profile.name.trim()}</title>
+        <meta name="description" content={profile.bio.trim()} />
+        <title>{profile.name.trim()}</title>
         <link rel="stylesheet" href="./profile.css" />
+        {motion && <script src="./background-motion.js" defer />}
       </head>
-      <body class="published-page" data-variant={doc.appearance.variant}>
+      <body class="published-page" data-variant={appearance.variant}>
         <main class="published-content profile-viewport">
-          <PublicProfile doc={doc} avatarUrl={avatar ? './avatar.png' : null} />
+          <PublicProfile
+            doc={doc}
+            assets={{
+              avatarUrl: avatar ? './avatar.png' : null,
+              backgroundUrl: filename ? './' + filename : undefined,
+              posterUrl: motion ? './background-poster.jpg' : undefined,
+            }}
+          />
         </main>
       </body>
     </html>,
   )
   const css = [
-    fontRules('./fonts/manrope-latin.woff2', './fonts/manrope-cyrillic.woff2'),
-    '.public-profile{--accent:' +
-      accent +
-      ';--accent-ink:' +
-      accentInk(accent) +
+    assets.fontCss.replace(
+      /url\(\.\/files\/([a-z0-9-]+\.woff2)\)/gu,
+      (_, name: string) => 'url(./' + fontPath(name) + ')',
+    ),
+    '.published-page{' +
+      Object.entries(profileVariables(appearance))
+        .map(([key, value]) => key + ':' + value)
+        .join(';') +
       '}',
     assets.css,
   ].join('\n')
@@ -71,9 +94,20 @@ export function siteFiles(
     'index.html': '<!doctype html>\n' + html,
     'profile.css': css,
     '.nojekyll': '',
-    'fonts/manrope-latin.woff2': assets.latinFont,
-    'fonts/manrope-cyrillic.woff2': assets.cyrillicFont,
+    ...Object.fromEntries(
+      Object.entries(assets.fonts).map(([name, bytes]) => [
+        fontPath(name),
+        bytes,
+      ]),
+    ),
     'fonts/OFL.txt': assets.fontLicense,
     ...(avatar ? { 'avatar.png': avatar } : {}),
+    ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),
+    ...(motion
+      ? {
+          'background-poster.jpg': decodeBase64(media.poster),
+          'background-motion.js': assets.motionScript!,
+        }
+      : {}),
   }
 }

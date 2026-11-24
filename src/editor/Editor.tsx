@@ -1,26 +1,23 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
+import type { Appearance } from '../profile/appearance'
 import {
-  defaultAccent,
   editableText,
   limits,
-  parseProfile,
   profileIssues,
   profileLanguage,
+  validateProfile,
   type LinkBlock,
   type ProfileDocument,
 } from '../profile/document'
-import { accentInk } from '../public/colors'
+import { examples } from '../profile/demo'
+import { bytesOf } from '../profile/media'
 import { PublicProfile } from '../public/PublicProfile'
+import { AppearanceEditor } from './Appearance'
 import { Icon } from './Icon'
-import {
-  download,
-  encodeAvatar,
-  importProfile,
-  normalizeAvatar,
-  pngDataUrl,
-} from './files'
+import { download, importProfile, normalizeAvatar, pngDataUrl } from './files'
 import type { StoredDraft } from './storage'
 import { useDraft } from './useDraft'
+import { usePreviewMedia } from './usePreviewMedia'
 
 const sections = ['Profile', 'Links', 'Appearance'] as const
 type Section = (typeof sections)[number]
@@ -37,17 +34,7 @@ const saveMessages = {
     'The saved draft was recovered. Unsupported control characters were removed or replaced.',
   conflict:
     'The saved draft changed in another tab. Export JSON to keep your edits here before loading the saved version.',
-  'invalid-edit': 'This draft could not be saved. Check the edited fields.',
 }
-
-const colors = [
-  ['Indigo', defaultAccent],
-  ['Raspberry', '#aa2161'],
-  ['Forest', '#176451'],
-  ['Blue', '#2350b4'],
-  ['Ochre', '#efaa3c'],
-  ['Graphite', '#252735'],
-] as const
 
 function message(error: unknown): string {
   return error instanceof Error
@@ -78,14 +65,16 @@ function fieldValue(
 export function Editor({
   initialDraft,
   sample,
-  sampleAvatarUrl,
 }: {
   initialDraft: StoredDraft
   sample: ProfileDocument
-  sampleAvatarUrl: string
 }) {
   const draft = useDraft(initialDraft, sample)
   const { doc, latest, status, otherDraft } = draft
+  const [priorAppearance, setPriorAppearance] = useState<Appearance | null>(
+    null,
+  )
+  const [publishAttempted, setPublishAttempted] = useState(false)
   const [section, setSection] = useState<Section>('Profile')
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [device, setDevice] = useState<'wide' | 'phone'>('wide')
@@ -105,6 +94,12 @@ export function Editor({
 
   const issues = profileIssues(doc)
   const avatar = doc.profile.avatar ? pngDataUrl(doc.profile.avatar) : null
+  const media = doc.appearance.background.media
+  const previewMedia = usePreviewMedia(media)
+  const exportBytes = media
+    ? bytesOf(media.data) + ('poster' in media ? bytesOf(media.poster) : 0)
+    : 0
+  const showNameError = publishAttempted && Boolean(issues.name)
   const previewDoc = {
     ...doc,
     blocks: doc.blocks.filter((_, index) => {
@@ -112,29 +107,8 @@ export function Editor({
       return issue && !issue.label && !issue.url
     }),
   }
-  const palette = {
-    '--accent': doc.appearance.accent,
-    '--accent-ink': accentInk(doc.appearance.accent),
-  }
   const quietStatus =
     status === 'ready' || status === 'pending' || status === 'saved'
-
-  useEffect(() => {
-    if (initialDraft.doc) return
-    const controller = new AbortController()
-    void fetch(sampleAvatarUrl, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return
-        const encoded = await encodeAvatar(await response.blob())
-        if (!controller.signal.aborted && avatarOperation.current === 0) {
-          draft.useSampleAvatar(encoded)
-        }
-      })
-      .catch(() => {
-        // The sample can be edited and published with initials.
-      })
-    return () => controller.abort()
-  }, [])
 
   useEffect(() => {
     if (pendingImport && !dialog.current?.open) dialog.current?.showModal()
@@ -150,6 +124,21 @@ export function Editor({
   function update(edit: (current: ProfileDocument) => ProfileDocument) {
     draft.update(edit)
     setNotice('')
+  }
+
+  function updateAppearance(
+    edit: (current: Appearance) => Appearance,
+    remember = false,
+  ) {
+    const previous = latest.current.appearance
+    if (remember) setPriorAppearance(previous)
+    update((current) => ({ ...current, appearance: edit(current.appearance) }))
+  }
+
+  function undoAppearance() {
+    if (!priorAppearance) return
+    updateAppearance(() => priorAppearance)
+    setPriorAppearance(null)
   }
 
   async function uploadAvatar(file: File) {
@@ -250,6 +239,8 @@ export function Editor({
   }
 
   function showProfile() {
+    setPriorAppearance(null)
+    setPublishAttempted(false)
     clearAvatarOperation()
     setSection('Profile')
     setMobileTab('edit')
@@ -267,6 +258,7 @@ export function Editor({
     if (format === 'zip' && exporting) return
     const snapshot = latest.current
     if (format === 'zip') {
+      setPublishAttempted(true)
       const problems = profileIssues(snapshot)
       const index = problems.blocks.findIndex(
         (block) => block.label || block.url,
@@ -289,8 +281,8 @@ export function Editor({
       }
     }
     try {
-      const clean = parseProfile(
-        JSON.stringify(snapshot),
+      const clean = validateProfile(
+        snapshot,
         format === 'zip' ? 'publish' : 'draft',
       )
       if (format === 'json') {
@@ -352,10 +344,23 @@ export function Editor({
           <button
             class="button button-primary"
             disabled={exporting}
+            aria-describedby={
+              exportBytes >= 3 * 1024 ** 2 ? 'site-export-size' : undefined
+            }
             onClick={() => void exportProfile('zip')}
           >
             <Icon name="download" />{' '}
             {exporting ? 'Preparing…' : 'Download site'}
+            {exportBytes >= 3 * 1024 ** 2 && (
+              <span
+                id="site-export-size"
+                class="export-size"
+                aria-hidden="true"
+              >
+                {' '}
+                · ≈ {(exportBytes / 1024 ** 2 + 0.4).toFixed(1)} MiB
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -401,8 +406,8 @@ export function Editor({
                   </button>
                   <button
                     class="button button-outline"
-                    onClick={() => {
-                      if (draft.loadStoredDraft()) {
+                    onClick={async () => {
+                      if (await draft.loadStoredDraft()) {
                         showProfile()
                         setNotice('Saved draft loaded.')
                       }
@@ -510,8 +515,8 @@ export function Editor({
                   id="profile-name"
                   value={doc.profile.name}
                   maxLength={limits.name}
-                  aria-invalid={Boolean(issues.name)}
-                  aria-describedby={issues.name ? 'name-error' : undefined}
+                  aria-invalid={showNameError}
+                  aria-describedby={showNameError ? 'name-error' : undefined}
                   onInput={(event) => {
                     const name = fieldValue(event.currentTarget)
                     update((current) => ({
@@ -520,7 +525,7 @@ export function Editor({
                     }))
                   }}
                 />
-                {issues.name && (
+                {showNameError && (
                   <span class="field-error" id="name-error">
                     {issues.name}
                   </span>
@@ -590,6 +595,20 @@ export function Editor({
                   </span>
                 )}
               </div>
+              <label class="appearance-check">
+                <input
+                  type="checkbox"
+                  checked={doc.branding.showMadeWithRvnce}
+                  onChange={(event) => {
+                    const showMadeWithRvnce = event.currentTarget.checked
+                    update((profile) => ({
+                      ...profile,
+                      branding: { showMadeWithRvnce },
+                    }))
+                  }}
+                />
+                Show Made with Rvnce
+              </label>
             </div>
           )}
           {section === 'Links' && (
@@ -704,70 +723,13 @@ export function Editor({
             </div>
           )}
           {section === 'Appearance' && (
-            <div class="form-panel">
-              <fieldset class="appearance-fieldset">
-                <legend>Theme</legend>
-                <div class="theme-options">
-                  {(['light', 'dark'] as const).map((variant) => (
-                    <label key={variant} class="theme-option">
-                      <input
-                        type="radio"
-                        name="variant"
-                        value={variant}
-                        checked={doc.appearance.variant === variant}
-                        onChange={() =>
-                          update((current) => ({
-                            ...current,
-                            appearance: { ...current.appearance, variant },
-                          }))
-                        }
-                      />
-                      <Icon name={variant === 'light' ? 'sun' : 'moon'} />
-                      {variant === 'light' ? 'Light' : 'Dark'}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset class="appearance-fieldset">
-                <legend>Accent color</legend>
-                <div class="swatches">
-                  {colors.map(([name, accent]) => (
-                    <button
-                      key={accent}
-                      type="button"
-                      class="swatch"
-                      style={{ '--swatch': accent }}
-                      title={name}
-                      aria-label={name}
-                      aria-pressed={doc.appearance.accent === accent}
-                      onClick={() =>
-                        update((current) => ({
-                          ...current,
-                          appearance: { ...current.appearance, accent },
-                        }))
-                      }
-                    >
-                      <span />
-                    </button>
-                  ))}
-                </div>
-                <label class="custom-color">
-                  <input
-                    type="color"
-                    value={doc.appearance.accent}
-                    onInput={(event) => {
-                      const accent = event.currentTarget.value
-                      update((current) => ({
-                        ...current,
-                        appearance: { ...current.appearance, accent },
-                      }))
-                    }}
-                  />{' '}
-                  Custom color{' '}
-                  <span>{doc.appearance.accent.toUpperCase()}</span>
-                </label>
-              </fieldset>
-            </div>
+            <AppearanceEditor
+              appearance={doc.appearance}
+              update={updateAppearance}
+              replace={(edit) => updateAppearance(edit, true)}
+              undo={undoAppearance}
+              canUndo={priorAppearance !== null}
+            />
           )}
         </section>
         <section class="preview-pane" aria-labelledby="preview-title">
@@ -798,22 +760,34 @@ export function Editor({
                   <Icon name="phone" />
                 </button>
               </div>
-              <a
-                class="demo-link"
-                href="./demo/index.html"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View demo <Icon name="external" />
-              </a>
+              <details class="example-menu">
+                <summary>Examples</summary>
+                <ul>
+                  {examples.map(({ preset, title }) => (
+                    <li key={preset}>
+                      <a
+                        href={
+                          './demo/' +
+                          (preset === 'graphic' ? '' : preset + '/') +
+                          'index.html'
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {title} <Icon name="external" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           </div>
-          <div
-            class="preview-frame profile-viewport"
-            data-device={device}
-            style={palette}
-          >
-            <PublicProfile doc={previewDoc} avatarUrl={avatar} preview />
+          <div class="preview-frame profile-viewport" data-device={device}>
+            <PublicProfile
+              doc={previewDoc}
+              assets={{ avatarUrl: avatar, ...previewMedia }}
+              preview
+            />
           </div>
         </section>
       </main>

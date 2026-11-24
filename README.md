@@ -2,21 +2,30 @@
 
 [English](README.md) · [Русский](README.ru.md)
 
-Rvnce is an open-source editor for personal bio pages. Build a profile in your browser, preview it as you edit, and download a standalone site you can host yourself.
+Rvnce is an open-source editor for personal bio pages. Start with a preset, make it yours, and download a standalone site you can host yourself.
 
-[Open the editor](https://sinzbtw.github.io/rvnce/) · [View the sample profile](https://sinzbtw.github.io/rvnce/demo/)
+[Open the editor](https://sinzbtw.github.io/rvnce/) · [Graphic](https://sinzbtw.github.io/rvnce/demo/) · [Minimal](https://sinzbtw.github.io/rvnce/demo/minimal/) · [Midnight](https://sinzbtw.github.io/rvnce/demo/midnight/) · [Glass](https://sinzbtw.github.io/rvnce/demo/glass/) · [Neon](https://sinzbtw.github.io/rvnce/demo/neon/)
 
-## What you can do
+![Rvnce appearance editor and live profile preview](docs/images/editor.png)
 
-- Edit a display name, bio, photo, and page language. Upload a PNG, JPEG, or WebP image up to 4 MiB, 24 megapixels, and 8192 pixels per side.
-- Add, edit, remove, and reorder up to 24 links.
-- Choose a light or dark profile and set an accent color.
-- Preview at wide and phone widths. Preview links are static. Published links open their destinations.
-- Import or export a versioned JSON draft, including incomplete fields and the photo, or download a ready-to-host ZIP once the profile is complete.
+![Five profiles rendered with the built-in presets](docs/images/presets.png)
 
-Rvnce saves one draft per browser origin. If the draft changes in another tab, the editor keeps your current edits on screen. Download a JSON copy before loading the saved version. If storage is unavailable, export a JSON copy before refreshing or closing the page.
+## Make a profile
 
-The sample profile, Mira Park, is fictional. Its portrait was supplied for the demo. The photographer and redistribution terms have yet to be confirmed. The sample links point to public design and software resources.
+1. In **Profile**, add a name, bio, language, and photo. **Show Made with Rvnce** is on for new profiles and is free to turn off or on at any time.
+2. In **Links**, add and reorder up to 24 destinations.
+3. In **Appearance**, choose a preset and a light or dark palette. Customize the background, fonts, profile card, avatar, links, and motion. Changes appear in the live preview. **Examples** opens published profiles in separate tabs.
+4. Download **Export JSON** for a full backup, **Export theme** to share just the appearance and its background, or **Download site** to publish.
+
+Rvnce saves one draft per browser origin. If another tab changes the draft, export your current edits before loading the saved version. If browser storage is unavailable, download a JSON backup before closing the editor.
+
+## Backgrounds and backups
+
+- Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB and 15 seconds. Both motion formats are limited to 1920 × 1080.
+- A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
+- Profile and theme JSON files can be up to 16 MiB. Profile backups use schema v3. Import upgrades v1 and v2 profiles with their Graphic styling and the credit off. Version 1 profiles receive the original default language, `en`.
+
+[Watch a short editor walkthrough](docs/images/appearance.gif).
 
 ## Run locally
 
@@ -25,49 +34,25 @@ Use Node.js 24 and npm.
     npm ci
     npm run dev
 
-Open the URL shown by Vite. The editor links to the sample static profile.
-
 For a production build and a local preview:
 
     npm run build
     npm run preview
 
-Serve the contents of `dist/` at the root or under a subpath to host the editor and sample profile.
+Serve `dist/` at the root or under a subpath to host the editor and examples.
 
 ## Publish a profile
 
-1. Fill in the display name, enter a page language tag such as `en`, and complete each link with a label and a full HTTP(S) URL. Choose **Download site**. The ZIP contains a re-encoded PNG, which strips metadata from the source photo.
-2. Extract the ZIP and upload its contents to your static host. Keep `index.html`, `profile.css`, the `fonts/` directory, the photo if present, and `.nojekyll` together.
-3. Open the URL for that directory.
+Choose **Download site**, extract the ZIP, and upload all the files in it to your static host. Keep `index.html`, `profile.css`, `.nojekyll`, the fonts, and any profile assets together.
 
-For GitHub Pages, put the extracted files at the root of the repository you use for your profile. Under **Settings → Pages**, set the source to **Deploy from a branch**, choose the branch with those files, and select **`/ (root)`**. GitHub shows the published URL after deployment. Relative asset paths also work for project sites under `/<repository>/`. The profile runs without a database, application server, or JavaScript.
+For GitHub Pages, upload the extracted files to the root of your profile repository. Under **Settings → Pages**, choose **Deploy from a branch**, select the branch and **`/ (root)`**, then open the URL that GitHub shows. The relative paths also work under a project subpath.
 
-## Profile JSON
+The exported page needs no server code and makes no requests to the editor. Text, links, static backgrounds, and the optional credit work without JavaScript. An animated background uses a small local player and falls back to its poster when scripting is off.
 
-**Export JSON** downloads a portable draft. **Import JSON** accepts v2 drafts and upgrades v1 profiles with `en`, the language used by earlier exports. Change the page language before publishing if the profile uses another language. A minimal example to import:
+## Development and license
 
-    {
-      "schemaVersion": 2,
-      "profile": { "name": "Mira Park", "bio": "Independent poster designer.", "avatar": null, "language": "en" },
-      "appearance": { "theme": "rvnce", "variant": "light", "accent": "#4434d4" },
-      "blocks": [
-        {
-          "id": "resources",
-          "type": "link",
-          "label": "Open-source tools",
-          "url": "https://github.com/explore"
-        }
-      ]
-    }
+Rvnce uses Preact, TypeScript, and Vite. The editor preview, sample pages, and site exporter share the same public profile renderer. Vitest covers documents and export logic. Playwright runs against the built editor and exported pages.
 
-## Development
+See [Architecture](ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), [Roadmap](ROADMAP.md), and [Security](SECURITY.md).
 
-Rvnce uses Preact, TypeScript, and Vite. The public renderer takes validated profile data and assets. The editor preview, sample profile, and exporter use that renderer. Vitest covers profile validation and export logic. Playwright tests the production editor and exported profiles.
-
-See [Architecture](ARCHITECTURE.md) for the component diagram and instructions for generating a local interactive code graph with Graphify.
-
-See [Contributing](CONTRIBUTING.md) for local checks and reviews, [Roadmap](ROADMAP.md) for planned work, and [Security](SECURITY.md) for the trust model and private reporting.
-
-## License
-
-Rvnce source code is licensed under [MIT](LICENSE). Manrope is distributed under the SIL Open Font License. Published exports include its license in `fonts/OFL.txt`.
+The source is licensed under [MIT](LICENSE). Manrope, Source Sans 3, and Source Serif 4 use the SIL Open Font License. Each exported profile includes the selected family's license in `fonts/OFL.txt`.

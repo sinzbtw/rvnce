@@ -2,15 +2,16 @@ import {
   avatarBytes,
   limits,
   parseProfile,
+  parseTheme,
   type ProfileDocument,
 } from '../profile/document'
-import { checkImageSize } from './image-size'
+import { checkImageSize } from '../profile/image-size'
 
 export function pngDataUrl(encoded: string): string {
   return 'data:image/png;base64,' + encoded
 }
 
-export function encodeAvatar(blob: Blob): Promise<string> {
+export function encodeBlob(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('The image could not be read.'))
@@ -27,7 +28,7 @@ export async function normalizeAvatar(file: File): Promise<string> {
   if (file.size > limits.uploadBytes)
     throw new Error('Choose an image up to 4 MiB.')
   checkImageSize(await file.arrayBuffer())
-  return encodeAvatar(await canvasPng(file))
+  return encodeBlob(await canvasPng(file))
 }
 
 async function canvasPng(source: Blob): Promise<Blob> {
@@ -70,9 +71,7 @@ export async function publishedAvatar(
 }
 
 export async function importProfile(file: File): Promise<ProfileDocument> {
-  if (file.size > limits.documentBytes)
-    throw new Error('Choose a Rvnce JSON file smaller than 1.2 MB.')
-  const doc = parseProfile(await file.text(), 'draft')
+  const doc = parseProfile(await readJsonFile(file), 'draft')
   if (doc.profile.avatar) {
     try {
       const image = await createImageBitmap(pngBlob(doc.profile.avatar))
@@ -81,7 +80,28 @@ export async function importProfile(file: File): Promise<ProfileDocument> {
       throw new Error('The avatar in this profile could not be opened.')
     }
   }
+  await checkImportedBackground(doc.appearance.background.media)
   return doc
+}
+
+export async function importTheme(file: File) {
+  const theme = parseTheme(await readJsonFile(file))
+  await checkImportedBackground(theme.appearance.background.media)
+  return theme
+}
+
+async function readJsonFile(file: File) {
+  if (file.size > limits.documentBytes)
+    throw new Error('Choose a Rvnce JSON file smaller than 16 MiB.')
+  return file.text()
+}
+
+async function checkImportedBackground(
+  media: ProfileDocument['appearance']['background']['media'],
+) {
+  if (!media) return
+  const { decodeImportedBackground } = await import('./background-files')
+  await decodeImportedBackground(media)
 }
 
 export function download(blob: Blob, filename: string): void {

@@ -1,9 +1,11 @@
 import { render } from 'preact'
 import '@fontsource-variable/manrope'
-import avatarUrl from './assets/mira-park.png'
+import '@fontsource-variable/source-sans-3'
+import '@fontsource-variable/source-serif-4'
 import { Editor } from './editor/Editor'
 import { readDraft } from './editor/storage'
-import { demoProfile } from './profile/demo'
+import { newProfile } from './profile/demo'
+import './public/background-motion.js'
 import './editor/editor.css'
 import './public/profile.css'
 
@@ -11,10 +13,11 @@ const root = document.getElementById('app')
 if (!root) throw new Error('The Rvnce editor root is missing.')
 
 render(
-  <Editor
-    initialDraft={readDraft()}
-    sample={demoProfile(null)}
-    sampleAvatarUrl={avatarUrl}
-  />,
+  <p class="startup-status" role="status">
+    Loading your draft…
+  </p>,
   root,
 )
+const initialDraft = await readDraft()
+
+render(<Editor initialDraft={initialDraft} sample={newProfile()} />, root)

@@ -8,6 +8,7 @@
     "jsxImportSource": "preact",
     "types": ["vite/client", "node"],
     "strict": true,
+    "allowJs": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

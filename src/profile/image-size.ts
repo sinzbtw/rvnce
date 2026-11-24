@@ -1,5 +1,3 @@
-import { limits } from '../profile/document'
-
 type ImageSize = [width: number, height: number]
 
 function jpegSize(data: DataView): ImageSize | undefined {
@@ -52,9 +50,15 @@ function webpSize(data: DataView): ImageSize | undefined {
   }
 }
 
-export function checkImageSize(buffer: ArrayBuffer): void {
+export function checkImageSize(
+  buffer: ArrayBuffer,
+  maxEdge = 8192,
+  maxPixels = 24_000_000,
+  expectedType?: 'image/png' | 'image/jpeg',
+): void {
   const data = new DataView(buffer)
   let size: ImageSize | undefined
+  let type = ''
   if (
     data.byteLength >= 24 &&
     data.getUint32(0) === 0x89504e47 &&
@@ -62,25 +66,34 @@ export function checkImageSize(buffer: ArrayBuffer): void {
     data.getUint32(8) === 13 &&
     data.getUint32(12) === 0x49484452
   ) {
+    type = 'image/png'
     size = [data.getUint32(16), data.getUint32(20)]
   } else if (data.byteLength >= 3 && data.getUint16(0) === 0xffd8) {
+    type = 'image/jpeg'
     size = jpegSize(data)
   } else if (
     data.byteLength >= 20 &&
     data.getUint32(0) === 0x52494646 &&
     data.getUint32(8) === 0x57454250
   ) {
+    type = 'image/webp'
     size = webpSize(data)
   }
-  if (!size || !size[0] || !size[1]) {
+  if (
+    !size ||
+    !size[0] ||
+    !size[1] ||
+    (expectedType && type !== expectedType)
+  ) {
     throw new Error('Choose a readable PNG, JPEG, or WebP image.')
   }
-  if (
-    Math.max(...size) > limits.uploadEdge ||
-    size[0] * size[1] > limits.uploadPixels
-  ) {
+  if (Math.max(...size) > maxEdge || size[0] * size[1] > maxPixels) {
     throw new Error(
-      'Choose an image up to 24 megapixels and 8192 pixels per side.',
+      'Choose an image up to ' +
+        maxPixels / 1_000_000 +
+        ' megapixels and ' +
+        maxEdge +
+        ' pixels per side.',
     )
   }
 }

@@ -7,10 +7,15 @@
 - Light and dark appearance with an accent color
 - Importable JSON and a standalone, script-free site ZIP
 
+## 0.2
+
+- Presets, reusable themes, local fonts, and advanced layout controls
+- Image, gradient, GIF, and video backgrounds with a static fallback
+- Optional Made with Rvnce credit and a showcase for all built-in presets
+
 ## Planned
 
-- Versioned reusable themes and template sharing
-- New block types, backgrounds, media, and an accessible optional audio player
+- Template sharing, new block types, and an accessible optional audio player
 - Widgets and integrations, starting with links and embeds that fit the trust model
 - A public-profile runtime that can be included in static exports for interactive blocks
 - Opt-in custom HTML, CSS, and JavaScript after an isolation design is implemented

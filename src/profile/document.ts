@@ -1,3 +1,13 @@
+import {
+  parseAppearance,
+  presetAppearance,
+  type Appearance,
+} from './appearance'
+import { accentInk } from './colors'
+import { hasKeys, isHex, record } from './shape'
+
+export const officialEditor = 'https://sinzbtw.github.io/rvnce/'
+
 export const limits = {
   name: 80,
   bio: 420,
@@ -10,10 +20,8 @@ export const limits = {
   uploadBytes: 4 * 1024 * 1024,
   uploadPixels: 24_000_000,
   uploadEdge: 8192,
-  documentBytes: 1250 * 1024,
+  documentBytes: 16 * 1024 * 1024,
 }
-
-export const defaultAccent = '#4434d4'
 
 export interface LinkBlock {
   id: string
@@ -23,30 +31,22 @@ export interface LinkBlock {
 }
 
 export interface ProfileDocument {
-  schemaVersion: 2
+  schemaVersion: 3
   profile: {
     name: string
     bio: string
     avatar: string | null
     language: string
   }
-  appearance: { theme: 'rvnce'; variant: 'light' | 'dark'; accent: string }
+  appearance: Appearance
+  branding: { showMadeWithRvnce: boolean }
   blocks: LinkBlock[]
 }
 
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function hasKeys(
-  value: unknown,
-  keys: string[],
-): value is Record<string, unknown> {
-  return (
-    record(value) &&
-    Object.keys(value).length === keys.length &&
-    keys.every((key) => Object.hasOwn(value, key))
-  )
+export interface ThemeDocument {
+  type: 'rvnce-theme'
+  schemaVersion: 1
+  appearance: Appearance
 }
 
 // eslint-disable-next-line no-control-regex -- Reject unprintable characters in imported fields.
@@ -140,32 +140,66 @@ export function profileIssues(doc: ProfileDocument) {
   }
 }
 
+function readJson(raw: string): unknown {
+  if (
+    raw.length > limits.documentBytes ||
+    (raw.length > limits.documentBytes / 3 &&
+      new Blob([raw]).size > limits.documentBytes)
+  ) {
+    throw new Error('Choose a Rvnce JSON file smaller than 16 MiB.')
+  }
+  try {
+    return JSON.parse(raw) as unknown
+  } catch {
+    throw new Error('This file does not contain valid JSON.')
+  }
+}
+
+export function parseTheme(raw: string): ThemeDocument {
+  const value = readJson(raw)
+  if (
+    !hasKeys(value, ['type', 'schemaVersion', 'appearance']) ||
+    value.type !== 'rvnce-theme' ||
+    value.schemaVersion !== 1
+  ) {
+    throw new Error('Choose a supported Rvnce theme JSON.')
+  }
+  return {
+    type: 'rvnce-theme',
+    schemaVersion: 1,
+    appearance: parseAppearance(value.appearance),
+  }
+}
+
 export function parseProfile(
   raw: string,
   mode: 'publish' | 'draft' | 'recover' = 'publish',
 ): ProfileDocument {
-  if (new TextEncoder().encode(raw).length > limits.documentBytes) {
-    throw new Error('Choose a Rvnce JSON file smaller than 1.2 MB.')
-  }
-  let value: unknown
-  try {
-    value = JSON.parse(raw)
-  } catch {
-    throw new Error('This file does not contain valid JSON.')
-  }
+  return validateProfile(readJson(raw), mode)
+}
+
+export function validateProfile(
+  value: unknown,
+  mode: 'publish' | 'draft' | 'recover' = 'publish',
+): ProfileDocument {
   if (
     !record(value) ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+    (value.schemaVersion !== 1 &&
+      value.schemaVersion !== 2 &&
+      value.schemaVersion !== 3)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
   }
-  if (!hasKeys(value, ['schemaVersion', 'profile', 'appearance', 'blocks'])) {
+  const version = value.schemaVersion
+  const keys = ['schemaVersion', 'profile', 'appearance', 'blocks']
+  if (version === 3) keys.push('branding')
+  if (!hasKeys(value, keys)) {
     throw new Error('This file does not match the Rvnce profile format.')
   }
 
   const { profile, appearance, blocks } = value
   const profileKeys = ['name', 'bio', 'avatar']
-  if (value.schemaVersion === 2) profileKeys.push('language')
+  if (version !== 1) profileKeys.push('language')
   const field = (input: unknown, multiline = false): unknown =>
     mode === 'recover' && typeof input === 'string'
       ? editableText(input, multiline)
@@ -175,7 +209,7 @@ export function parseProfile(
   }
   const name = field(profile.name)
   const bio = field(profile.bio, true)
-  const language = value.schemaVersion === 1 ? 'en' : field(profile.language)
+  const language = version === 1 ? 'en' : field(profile.language)
   if (
     !text(name, limits.name) ||
     !text(bio, limits.bio) ||
@@ -185,14 +219,32 @@ export function parseProfile(
     throw new Error('The profile details are invalid.')
   }
   if (profile.avatar !== null) validateAvatar(profile.avatar)
-  if (
-    !hasKeys(appearance, ['theme', 'variant', 'accent']) ||
-    appearance.theme !== 'rvnce' ||
-    (appearance.variant !== 'light' && appearance.variant !== 'dark') ||
-    typeof appearance.accent !== 'string' ||
-    !/^#[0-9a-f]{6}$/i.test(appearance.accent)
-  ) {
-    throw new Error('The profile appearance is invalid.')
+  let parsedAppearance: Appearance
+  let showMadeWithRvnce = false
+  if (version === 3) {
+    parsedAppearance = parseAppearance(appearance)
+    if (
+      !hasKeys(value.branding, ['showMadeWithRvnce']) ||
+      typeof value.branding.showMadeWithRvnce !== 'boolean'
+    ) {
+      throw new Error('The profile branding is invalid.')
+    }
+    showMadeWithRvnce = value.branding.showMadeWithRvnce
+  } else {
+    if (
+      !hasKeys(appearance, ['theme', 'variant', 'accent']) ||
+      appearance.theme !== 'rvnce' ||
+      (appearance.variant !== 'light' && appearance.variant !== 'dark') ||
+      !isHex(appearance.accent)
+    ) {
+      throw new Error('The profile appearance is invalid.')
+    }
+    parsedAppearance = {
+      ...presetAppearance('graphic', appearance.variant),
+      accent: appearance.accent,
+    }
+    parsedAppearance.links.color = appearance.accent
+    parsedAppearance.links.text = accentInk(appearance.accent)
   }
   if (!Array.isArray(blocks) || blocks.length > limits.blocks) {
     throw new Error('The profile must have at most 24 links.')
@@ -219,13 +271,10 @@ export function parseProfile(
     return { id: block.id, type: 'link', label, url }
   })
   const doc: ProfileDocument = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     profile: { name, bio, avatar: profile.avatar, language },
-    appearance: {
-      theme: 'rvnce',
-      variant: appearance.variant,
-      accent: appearance.accent,
-    },
+    appearance: parsedAppearance,
+    branding: { showMadeWithRvnce },
     blocks: parsedBlocks,
   }
   if (mode === 'publish') {
