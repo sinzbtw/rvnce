@@ -9,7 +9,7 @@ import css from '../public/profile.css?raw'
 import motionScript from '../public/background-motion.js?raw'
 import { fontFiles, siteFiles } from '../export/site'
 import type { ProfileDocument } from '../profile/document'
-import { publishedAvatar } from './files'
+import { publishedAvatar, publishedFavicon } from './files'
 
 const fontUrls = import.meta.glob<string>(
   '/node_modules/@fontsource-variable/{manrope,source-sans-3,source-serif-4}/files/*-wght-normal.woff2',
@@ -38,7 +38,7 @@ async function asset(
 export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
   const family = doc.appearance.typography.font
   const [fontCss, fontLicense] = fontAssets[family]
-  const [fonts, avatar] = await Promise.all([
+  const [fonts, avatar, favicon] = await Promise.all([
     Promise.all(
       fontFiles(fontCss).map(
         async (name) =>
@@ -56,6 +56,7 @@ export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
       ),
     ),
     doc.profile.avatar ? publishedAvatar(doc.profile.avatar) : undefined,
+    doc.branding.favicon ? publishedFavicon(doc.branding.favicon) : undefined,
   ])
   const files = siteFiles(doc, {
     css,
@@ -64,6 +65,7 @@ export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
     fonts: Object.fromEntries(fonts),
     fontLicense: strToU8(fontLicense),
     avatar,
+    favicon,
   })
   const entries: Zippable = {}
   for (const [name, contents] of Object.entries(files)) {

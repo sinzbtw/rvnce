@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
+import brandMark from '../assets/rvnce-mark.png?url&no-inline'
 import type { Appearance } from '../profile/appearance'
 import {
   editableText,
@@ -13,14 +14,39 @@ import { examples } from '../profile/demo'
 import { bytesOf } from '../profile/media'
 import { PublicProfile } from '../public/PublicProfile'
 import { AppearanceEditor } from './Appearance'
+import { useFloatingPreview } from './floating-preview'
 import { Icon } from './Icon'
-import { download, importProfile, normalizeAvatar, pngDataUrl } from './files'
+import {
+  download,
+  importProfile,
+  normalizeAvatar,
+  normalizeFavicon,
+  pngDataUrl,
+} from './files'
+import { locales, type Locale, type Message } from './messages'
+import { useLinkMotion, usePanelMotion } from './motion'
+import {
+  applyLocale,
+  transitionTheme,
+  CopyContext,
+  copyFor,
+  errorCopy,
+  languageNames,
+  savePreference,
+  themes,
+  type EditorTheme,
+} from './preferences'
 import type { StoredDraft } from './storage'
 import { useDraft } from './useDraft'
 import { usePreviewMedia } from './usePreviewMedia'
 
 const sections = ['Profile', 'Links', 'Appearance'] as const
 type Section = (typeof sections)[number]
+const sectionIcons = {
+  Profile: 'person',
+  Links: 'link',
+  Appearance: 'palette',
+} as const
 
 const saveMessages = {
   ready: 'Edits save here',
@@ -34,12 +60,41 @@ const saveMessages = {
     'The saved draft was recovered. Unsupported control characters were removed or replaced.',
   conflict:
     'The saved draft changed in another tab. Export JSON to keep your edits here before loading the saved version.',
-}
+} as const
 
-function message(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Something went wrong. Try again.'
+const themeLabels = { system: 'System', light: 'Light', dark: 'Dark' } as const
+const themeIcons = { system: 'monitor', light: 'sun', dark: 'moon' } as const
+const phoneLayout = '(max-width: 859px)'
+
+function useImageFile(
+  normalize: (file: File) => Promise<string>,
+  change: (encoded: string) => void,
+) {
+  const operation = useRef(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<{ cause: unknown } | null>(null)
+
+  function clear() {
+    operation.current++
+    setLoading(false)
+    setError(null)
+  }
+
+  async function upload(file: File) {
+    const id = ++operation.current
+    setError(null)
+    setLoading(true)
+    try {
+      const encoded = await normalize(file)
+      if (id === operation.current) change(encoded)
+    } catch (cause) {
+      if (id === operation.current) setError({ cause })
+    } finally {
+      if (id === operation.current) setLoading(false)
+    }
+  }
+
+  return { loading, error, clear, upload }
 }
 
 function fieldValue(
@@ -65,9 +120,13 @@ function fieldValue(
 export function Editor({
   initialDraft,
   sample,
+  initialLocale,
+  initialTheme,
 }: {
   initialDraft: StoredDraft
   sample: ProfileDocument
+  initialLocale: Locale
+  initialTheme: EditorTheme
 }) {
   const draft = useDraft(initialDraft, sample)
   const { doc, latest, status, otherDraft } = draft
@@ -78,24 +137,73 @@ export function Editor({
   const [section, setSection] = useState<Section>('Profile')
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [device, setDevice] = useState<'wide' | 'phone'>('wide')
-  const [notice, setNotice] = useState('')
-  const [avatarError, setAvatarError] = useState('')
-  const [avatarLoading, setAvatarLoading] = useState(false)
+  const [locale, setLocale] = useState(initialLocale)
+  const [theme, setTheme] = useState(initialTheme)
+  const [desktopPreview, setDesktopPreview] = useState(false)
+  const [mobile, setMobile] = useState(() => matchMedia(phoneLayout).matches)
+  const [notice, setNotice] = useState<Message | { cause: unknown } | null>(
+    null,
+  )
   const [exporting, setExporting] = useState(false)
   const [pendingImport, setPendingImport] = useState<ProfileDocument | null>(
     null,
   )
+  const [importName, setImportName] = useState('')
   const importInput = useRef<HTMLInputElement>(null)
   const avatarInput = useRef<HTMLInputElement>(null)
+  const faviconInput = useRef<HTMLInputElement>(null)
   const dialog = useRef<HTMLDialogElement>(null)
+  const preferencesMenu = useRef<HTMLDetailsElement>(null)
   const addFocus = useRef<string | null>(null)
-  const avatarOperation = useRef(0)
   const importOperation = useRef(0)
+  const mobileScroll = useRef(0)
+  const returningToEditor = useRef(false)
+  const settingsPanel = useRef<HTMLDivElement>(null)
+  const settings = useRef<HTMLElement>(null)
+  const previewPane = useRef<HTMLElement>(null)
+  const previewToggle = useRef<HTMLButtonElement>(null)
+  const focusPreview = useRef(false)
+  const previewGrip = useRef<HTMLButtonElement>(null)
+  const previewFrame = useRef<HTMLDivElement>(null)
+  const examplesMenu = useRef<HTMLDetailsElement>(null)
+  const t = copyFor(locale)
+
+  const avatarFile = useImageFile(normalizeAvatar, (encoded) =>
+    update((current) => ({
+      ...current,
+      profile: { ...current.profile, avatar: encoded },
+    })),
+  )
+  const faviconFile = useImageFile(normalizeFavicon, (encoded) =>
+    update((current) => ({
+      ...current,
+      branding: { ...current.branding, favicon: encoded },
+    })),
+  )
+  const previewShown = mobile ? mobileTab === 'preview' : desktopPreview
+  const previewMobileDevice = mobile ? 'phone' : device
+  const previewGesture = useFloatingPreview(
+    previewPane,
+    desktopPreview,
+    !mobile,
+  )
+  const captureLinks = useLinkMotion(settingsPanel, doc.blocks)
+  usePanelMotion(
+    settingsPanel,
+    mobile && mobileTab === 'preview' ? null : section,
+    0.16,
+  )
+  usePanelMotion(
+    previewFrame,
+    mobile ? (previewShown ? 'phone' : null) : device,
+    0.22,
+  )
 
   const issues = profileIssues(doc)
   const avatar = doc.profile.avatar ? pngDataUrl(doc.profile.avatar) : null
+  const favicon = doc.branding.favicon ? pngDataUrl(doc.branding.favicon) : null
   const media = doc.appearance.background.media
-  const previewMedia = usePreviewMedia(media)
+  const previewMedia = usePreviewMedia(previewShown ? media : null)
   const exportBytes = media
     ? bytesOf(media.data) + ('poster' in media ? bytesOf(media.poster) : 0)
     : 0
@@ -111,6 +219,72 @@ export function Editor({
     status === 'ready' || status === 'pending' || status === 'saved'
 
   useEffect(() => {
+    const query = matchMedia(phoneLayout)
+    const change = () => setMobile(query.matches)
+    query.addEventListener('change', change)
+    change()
+    return () => query.removeEventListener('change', change)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!mobile) return
+    if (mobileTab === 'preview') {
+      window.scrollTo(0, 0)
+    } else if (returningToEditor.current) {
+      returningToEditor.current = false
+      window.scrollTo(0, mobileScroll.current)
+    }
+  }, [mobile, mobileTab])
+
+  useLayoutEffect(() => {
+    if (!desktopPreview || mobile || !focusPreview.current) return
+    focusPreview.current = false
+    previewGrip.current?.focus({ preventScroll: true })
+  }, [desktopPreview, mobile])
+
+  useEffect(() => {
+    const lightDismiss = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      for (const menu of [preferencesMenu.current, examplesMenu.current]) {
+        if (menu?.open && !menu.contains(target)) menu.open = false
+      }
+    }
+    const escape = (event: KeyboardEvent) => {
+      const menu = preferencesMenu.current
+      if (event.key !== 'Escape' || event.defaultPrevented || !menu?.open)
+        return
+      menu.open = false
+      menu.querySelector('summary')?.focus()
+    }
+    document.addEventListener('pointerdown', lightDismiss)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', lightDismiss)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [])
+
+  function switchMobile(tab: 'edit' | 'preview') {
+    if (tab === mobileTab) return
+    if (tab === 'preview') mobileScroll.current = window.scrollY
+    returningToEditor.current = tab === 'edit'
+    setMobileTab(tab)
+  }
+
+  function switchSection(next: Section) {
+    if (next === section) return
+    setSection(next)
+    if (settings.current && settings.current.getBoundingClientRect().top < 0)
+      settings.current.scrollIntoView({ block: 'start' })
+  }
+
+  function closeDesktopPreview() {
+    setDesktopPreview(false)
+    previewToggle.current?.focus({ preventScroll: true })
+  }
+
+  useEffect(() => {
     if (pendingImport && !dialog.current?.open) dialog.current?.showModal()
   }, [pendingImport])
 
@@ -123,7 +297,7 @@ export function Editor({
 
   function update(edit: (current: ProfileDocument) => ProfileDocument) {
     draft.update(edit)
-    setNotice('')
+    setNotice(null)
   }
 
   function updateAppearance(
@@ -141,41 +315,25 @@ export function Editor({
     setPriorAppearance(null)
   }
 
-  async function uploadAvatar(file: File) {
-    const operation = ++avatarOperation.current
-    setAvatarError('')
-    setAvatarLoading(true)
-    try {
-      const avatar = await normalizeAvatar(file)
-      if (operation === avatarOperation.current) {
-        update((current) => ({
-          ...current,
-          profile: { ...current.profile, avatar },
-        }))
-      }
-    } catch (error) {
-      if (operation === avatarOperation.current) setAvatarError(message(error))
-    } finally {
-      if (operation === avatarOperation.current) setAvatarLoading(false)
-    }
-  }
-
-  function clearAvatarOperation() {
-    avatarOperation.current++
-    setAvatarLoading(false)
-    setAvatarError('')
-  }
-
   function removeAvatar() {
-    clearAvatarOperation()
+    avatarFile.clear()
     update((current) => ({
       ...current,
       profile: { ...current.profile, avatar: null },
     }))
   }
 
+  function removeFavicon() {
+    faviconFile.clear()
+    update((current) => ({
+      ...current,
+      branding: { ...current.branding, favicon: null },
+    }))
+  }
+
   function addLink() {
     if (latest.current.blocks.length >= limits.blocks) return
+    captureLinks()
     const id = Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) =>
       byte.toString(16).padStart(2, '0'),
     ).join('')
@@ -203,6 +361,7 @@ export function Editor({
       const from = blocks[index]
       const to = blocks[target]
       if (!from || !to) return current
+      captureLinks()
       blocks[index] = to
       blocks[target] = from
       const direction =
@@ -217,6 +376,8 @@ export function Editor({
 
   function removeLink(id: string) {
     const index = latest.current.blocks.findIndex((block) => block.id === id)
+    if (index < 0) return
+    captureLinks(id)
     const next =
       latest.current.blocks[index + 1] ?? latest.current.blocks[index - 1]
     addFocus.current = next ? 'label-' + next.id : 'add-link'
@@ -231,17 +392,20 @@ export function Editor({
     try {
       const imported = await importProfile(file)
       if (operation !== importOperation.current) return
-      setNotice('')
+      setNotice(null)
+      setImportName(imported.profile.name.trim())
       setPendingImport(imported)
-    } catch (error) {
-      if (operation === importOperation.current) setNotice(message(error))
+    } catch (cause) {
+      if (operation === importOperation.current) setNotice({ cause })
     }
   }
 
   function showProfile() {
     setPriorAppearance(null)
     setPublishAttempted(false)
-    clearAvatarOperation()
+    avatarFile.clear()
+    faviconFile.clear()
+    returningToEditor.current = false
     setSection('Profile')
     setMobileTab('edit')
   }
@@ -297,25 +461,106 @@ export function Editor({
         download(await zipProfile(clean), 'rvnce-site.zip')
         setNotice('Site ZIP downloaded.')
       }
-    } catch (error) {
-      setNotice(message(error))
+    } catch (cause) {
+      setNotice({ cause })
     } finally {
       if (format === 'zip') setExporting(false)
     }
   }
 
   function linkLabel(block: LinkBlock, index: number) {
-    return block.label.trim() || 'Link ' + (index + 1)
+    return block.label.trim() || t('Link {value}', { value: index + 1 })
   }
 
   return (
-    <>
+    <CopyContext.Provider value={t}>
       <header class="app-header">
-        <div class="brand" aria-label="Rvnce">
-          <span class="brand-mark" aria-hidden="true">
-            R
-          </span>
+        <div class="brand">
+          <img src={brandMark} width="36" height="36" alt="" />
           <span>Rvnce</span>
+        </div>
+        <div class="header-tools">
+          <details class="preferences-menu" ref={preferencesMenu}>
+            <summary
+              class="button button-quiet preferences-trigger"
+              title={t('Editor settings')}
+              aria-label={t('Editor settings')}
+            >
+              <Icon name="settings" />
+              {t('Settings')}
+            </summary>
+            <div
+              class="preferences-popover"
+              role="group"
+              aria-label={t('Editor settings')}
+            >
+              <label class="field preference-field">
+                <Icon name="globe" />
+                <span class="field-label">{t('Editor language')}</span>
+                <select
+                  id="editor-language"
+                  value={locale}
+                  onChange={(event) => {
+                    const next = locales.find(
+                      (value) => value === event.currentTarget.value,
+                    )
+                    if (!next) return
+                    applyLocale(next)
+                    savePreference('locale', next)
+                    setLocale(next)
+                  }}
+                >
+                  {locales.map((value) => (
+                    <option key={value} value={value} lang={value}>
+                      {languageNames[value]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <fieldset class="theme-preference" id="editor-theme">
+                <legend class="field-label">{t('Editor theme')}</legend>
+                <div class="theme-segments">
+                  {themes.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      class="button button-quiet"
+                      aria-pressed={theme === value}
+                      data-theme={value}
+                      onClick={() => {
+                        if (theme === value) return
+                        transitionTheme(value)
+                        savePreference('theme', value)
+                        setTheme(value)
+                      }}
+                    >
+                      <Icon name={themeIcons[value]} />
+                      {t(themeLabels[value])}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+          </details>
+          <button
+            type="button"
+            class="button button-quiet preview-toggle"
+            ref={previewToggle}
+            aria-controls="preview-pane"
+            aria-expanded={desktopPreview}
+            aria-label={t(desktopPreview ? 'Hide preview' : 'Show preview')}
+            title={t(desktopPreview ? 'Hide preview' : 'Show preview')}
+            onClick={(event) => {
+              if (desktopPreview) closeDesktopPreview()
+              else {
+                focusPreview.current = event.detail === 0
+                setDesktopPreview(true)
+              }
+            }}
+          >
+            <Icon name="panel" />
+            <span class="preview-toggle-label">{t('Preview')}</span>
+          </button>
         </div>
         <div class="header-actions">
           <input
@@ -331,15 +576,19 @@ export function Editor({
           />
           <button
             class="button button-quiet"
+            title={t('Import JSON')}
             onClick={() => importInput.current?.click()}
           >
-            <Icon name="upload" /> Import JSON
+            <Icon name="upload" />{' '}
+            <span class="action-label">{t('Import JSON')}</span>
           </button>
           <button
             class="button button-quiet"
+            title={t('Export JSON')}
             onClick={() => void exportProfile('json')}
           >
-            <Icon name="file" /> Export JSON
+            <Icon name="file" />{' '}
+            <span class="action-label">{t('Export JSON')}</span>
           </button>
           <button
             class="button button-primary"
@@ -350,7 +599,7 @@ export function Editor({
             onClick={() => void exportProfile('zip')}
           >
             <Icon name="download" />{' '}
-            {exporting ? 'Preparing…' : 'Download site'}
+            {t(exporting ? 'Preparing…' : 'Download site')}
             {exportBytes >= 3 * 1024 ** 2 && (
               <span
                 id="site-export-size"
@@ -367,8 +616,14 @@ export function Editor({
       {(!quietStatus || notice) && (
         <div class="notice-strip">
           <div class="notice-messages" role="status">
-            {!quietStatus && <p>{saveMessages[status]}</p>}
-            {notice && <p>{notice}</p>}
+            {!quietStatus && <p>{t(saveMessages[status])}</p>}
+            {notice && (
+              <p>
+                {typeof notice === 'string'
+                  ? t(notice)
+                  : errorCopy(t, notice.cause)}
+              </p>
+            )}
           </div>
           {otherDraft && (
             <div class="draft-actions">
@@ -387,13 +642,13 @@ export function Editor({
                       }
                     }}
                   >
-                    Download original
+                    {t('Download original')}
                   </button>
                   <button
                     class="button button-outline"
                     onClick={draft.replaceUnreadableDraft}
                   >
-                    Replace saved draft
+                    {t('Replace saved draft')}
                   </button>
                 </>
               ) : (
@@ -402,7 +657,7 @@ export function Editor({
                     class="button button-outline"
                     onClick={() => void exportProfile('json')}
                   >
-                    Download my copy
+                    {t('Download my copy')}
                   </button>
                   <button
                     class="button button-outline"
@@ -413,7 +668,7 @@ export function Editor({
                       }
                     }}
                   >
-                    Load saved draft
+                    {t('Load saved draft')}
                   </button>
                 </>
               )}
@@ -421,373 +676,533 @@ export function Editor({
           )}
         </div>
       )}
-      <nav class="mobile-nav" aria-label="Workspace">
+      <nav class="mobile-nav" aria-label={t('Workspace')}>
         <button
           aria-pressed={mobileTab === 'edit'}
-          onClick={() => setMobileTab('edit')}
+          onClick={() => switchMobile('edit')}
         >
-          Editor
+          {t('Editor')}
         </button>
         <button
           aria-pressed={mobileTab === 'preview'}
-          onClick={() => setMobileTab('preview')}
+          onClick={() => switchMobile('preview')}
         >
-          Preview
+          {t('Preview')}
         </button>
       </nav>
-      <main class="workspace" data-mobile-tab={mobileTab}>
-        <section class="settings" aria-labelledby="editor-title">
-          <div class="editor-heading">
-            <h1 id="editor-title">Edit profile</h1>
-            {quietStatus && (
-              <span class="save-status" role="status">
-                <span aria-hidden="true" />
-                {saveMessages[status]}
-              </span>
-            )}
-          </div>
-          <nav class="section-nav" aria-label="Profile settings">
+      <main
+        class="workspace"
+        data-mobile-tab={mobileTab}
+        data-desktop-preview={desktopPreview ? 'shown' : 'hidden'}
+      >
+        <aside class="editor-sidebar">
+          <nav class="section-nav" aria-label={t('Profile settings')}>
             {sections.map((item) => (
               <button
                 key={item}
                 aria-pressed={section === item}
-                onClick={() => setSection(item)}
+                onClick={() => switchSection(item)}
               >
-                {item}
+                <Icon name={sectionIcons[item]} />
+                {t(item)}
               </button>
             ))}
           </nav>
-          {section === 'Profile' && (
-            <div class="form-panel">
-              <div class="avatar-field">
-                <div class="avatar-small">
-                  {avatar ? (
-                    <img src={avatar} alt="" />
-                  ) : (
-                    <span aria-hidden="true">R</span>
-                  )}
-                </div>
-                <div class="avatar-controls">
-                  <span class="field-label">Profile photo</span>
-                  <p>PNG, JPG or WebP · up to 4 MiB and 24 MP</p>
-                  <div class="avatar-actions">
-                    <input
-                      ref={avatarInput}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      hidden
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0]
-                        event.currentTarget.value = ''
-                        if (file) void uploadAvatar(file)
-                      }}
-                    />
-                    <button
-                      class="button button-outline"
-                      disabled={avatarLoading}
-                      onClick={() => avatarInput.current?.click()}
-                    >
-                      {avatarLoading
-                        ? 'Processing…'
-                        : avatar
-                          ? 'Change photo'
-                          : 'Upload photo'}
-                    </button>
-                    {avatar && (
-                      <button
-                        class="button button-quiet"
-                        onClick={removeAvatar}
-                      >
-                        Remove
-                      </button>
+        </aside>
+        <section class="settings" aria-labelledby="editor-title" ref={settings}>
+          <div class="editor-heading">
+            <h1 id="editor-title">{t('Edit profile')}</h1>
+            {quietStatus && (
+              <span class="save-status" role="status">
+                <span aria-hidden="true" />
+                {t(saveMessages[status])}
+              </span>
+            )}
+          </div>
+          <div class="editor-panel" ref={settingsPanel}>
+            {section === 'Profile' && (
+              <div class="form-panel">
+                <div class="avatar-field">
+                  <div class="avatar-small">
+                    {avatar ? (
+                      <img src={avatar} alt="" />
+                    ) : (
+                      <Icon name="person" />
                     )}
                   </div>
+                  <div class="avatar-controls">
+                    <span class="field-label">{t('Profile photo')}</span>
+                    <p>{t('PNG, JPG or WebP · up to 4 MiB and 24 MP')}</p>
+                    <div class="avatar-actions">
+                      <input
+                        ref={avatarInput}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        hidden
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          if (file) void avatarFile.upload(file)
+                        }}
+                      />
+                      <button
+                        class="button button-outline"
+                        disabled={avatarFile.loading}
+                        onClick={() => avatarInput.current?.click()}
+                      >
+                        {t(
+                          avatarFile.loading
+                            ? 'Processing…'
+                            : avatar
+                              ? 'Change photo'
+                              : 'Upload photo',
+                        )}
+                      </button>
+                      {avatar && (
+                        <button
+                          class="button button-quiet"
+                          onClick={removeAvatar}
+                        >
+                          {t('Remove')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {avatarError && (
-                <p class="field-error" role="alert">
-                  {avatarError}
-                </p>
-              )}
-              <label class="field" for="profile-name">
-                <span class="field-label">Display name</span>
-                <input
-                  id="profile-name"
-                  value={doc.profile.name}
-                  maxLength={limits.name}
-                  aria-invalid={showNameError}
-                  aria-describedby={showNameError ? 'name-error' : undefined}
-                  onInput={(event) => {
-                    const name = fieldValue(event.currentTarget)
-                    update((current) => ({
-                      ...current,
-                      profile: { ...current.profile, name },
-                    }))
-                  }}
-                />
-                {showNameError && (
-                  <span class="field-error" id="name-error">
-                    {issues.name}
-                  </span>
+                {avatarFile.error && (
+                  <p class="field-error" role="alert">
+                    {errorCopy(t, avatarFile.error.cause)}
+                  </p>
                 )}
-              </label>
-              <div class="field">
-                <label class="field-label" for="profile-bio">
-                  Bio
+                <label class="field" for="profile-name">
+                  <span class="field-label">{t('Display name')}</span>
+                  <input
+                    id="profile-name"
+                    value={doc.profile.name}
+                    maxLength={limits.name}
+                    aria-invalid={showNameError}
+                    aria-describedby={showNameError ? 'name-error' : undefined}
+                    onInput={(event) => {
+                      const name = fieldValue(event.currentTarget)
+                      update((current) => ({
+                        ...current,
+                        profile: { ...current.profile, name },
+                      }))
+                    }}
+                  />
+                  {showNameError && (
+                    <span class="field-error" id="name-error">
+                      {issues.name && t(issues.name)}
+                    </span>
+                  )}
                 </label>
-                <textarea
-                  id="profile-bio"
-                  rows={4}
-                  value={doc.profile.bio}
-                  maxLength={limits.bio}
-                  aria-describedby="bio-limit"
-                  onInput={(event) => {
-                    const bio = fieldValue(event.currentTarget, true)
-                    update((current) => ({
-                      ...current,
-                      profile: { ...current.profile, bio },
-                    }))
-                  }}
-                />
-                <span class="character-count" id="bio-limit">
-                  {doc.profile.bio.length} / {limits.bio}
-                </span>
-              </div>
-              <div class="field">
-                <label class="field-label" for="profile-language">
-                  Page language
-                </label>
-                <input
-                  id="profile-language"
-                  value={doc.profile.language}
-                  maxLength={limits.language}
-                  autoCapitalize="off"
-                  spellcheck={false}
-                  aria-invalid={Boolean(issues.language)}
-                  aria-describedby={
-                    issues.language ? 'language-error' : 'language-help'
-                  }
-                  onInput={(event) => {
-                    const language = fieldValue(event.currentTarget)
-                    update((current) => ({
-                      ...current,
-                      profile: { ...current.profile, language },
-                    }))
-                  }}
-                  onBlur={(event) => {
-                    const entered = event.currentTarget.value
-                    const language = profileLanguage(entered)
-                    if (language && language !== entered) {
+                <div class="field">
+                  <label class="field-label" for="profile-bio">
+                    {t('Bio')}
+                  </label>
+                  <textarea
+                    id="profile-bio"
+                    rows={4}
+                    value={doc.profile.bio}
+                    maxLength={limits.bio}
+                    aria-describedby="bio-limit"
+                    onInput={(event) => {
+                      const bio = fieldValue(event.currentTarget, true)
+                      update((current) => ({
+                        ...current,
+                        profile: { ...current.profile, bio },
+                      }))
+                    }}
+                  />
+                  <span class="character-count" id="bio-limit">
+                    {doc.profile.bio.length} / {limits.bio}
+                  </span>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="profile-language">
+                    {t('Page language')}
+                  </label>
+                  <input
+                    id="profile-language"
+                    value={doc.profile.language}
+                    maxLength={limits.language}
+                    autoCapitalize="off"
+                    spellcheck={false}
+                    aria-invalid={Boolean(issues.language)}
+                    aria-describedby={
+                      issues.language ? 'language-error' : 'language-help'
+                    }
+                    onInput={(event) => {
+                      const language = fieldValue(event.currentTarget)
                       update((current) => ({
                         ...current,
                         profile: { ...current.profile, language },
                       }))
-                    }
-                  }}
-                />
-                {issues.language ? (
-                  <span class="field-error" id="language-error">
-                    {issues.language}
+                    }}
+                    onBlur={(event) => {
+                      const entered = event.currentTarget.value
+                      const language = profileLanguage(entered)
+                      if (language && language !== entered) {
+                        update((current) => ({
+                          ...current,
+                          profile: { ...current.profile, language },
+                        }))
+                      }
+                    }}
+                  />
+                  {issues.language ? (
+                    <span class="field-error" id="language-error">
+                      {t(issues.language)}
+                    </span>
+                  ) : (
+                    <span class="field-help" id="language-help">
+                      {t('Use a language tag such as en, ru, or pt-BR.')}
+                    </span>
+                  )}
+                </div>
+                <div class="favicon-field">
+                  <span class="favicon-thumbnail" aria-hidden="true">
+                    {favicon ? (
+                      <img src={favicon} alt="" />
+                    ) : (
+                      <Icon name="file" />
+                    )}
                   </span>
-                ) : (
-                  <span class="field-help" id="language-help">
-                    Use a language tag such as en, ru, or pt-BR.
-                  </span>
+                  <div class="avatar-controls">
+                    <span class="field-label">{t('Browser tab icon')}</span>
+                    <p>
+                      {t('Shown in the browser tab of your published site.')}
+                    </p>
+                    <div class="avatar-actions">
+                      <input
+                        id="favicon-file"
+                        ref={faviconInput}
+                        type="file"
+                        accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                        aria-label={t('Browser tab icon')}
+                        hidden
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          if (file) void faviconFile.upload(file)
+                        }}
+                      />
+                      <button
+                        type="button"
+                        class="button button-outline"
+                        disabled={faviconFile.loading}
+                        onClick={() => faviconInput.current?.click()}
+                      >
+                        {t(
+                          faviconFile.loading
+                            ? 'Processing…'
+                            : favicon
+                              ? 'Change icon'
+                              : 'Upload icon',
+                        )}
+                      </button>
+                      {favicon && (
+                        <button
+                          type="button"
+                          class="button button-quiet"
+                          onClick={removeFavicon}
+                        >
+                          {t('Remove icon')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {faviconFile.error && (
+                  <p class="field-error" role="alert">
+                    {errorCopy(t, faviconFile.error.cause)}
+                  </p>
+                )}
+                <label class="appearance-check">
+                  <input
+                    type="checkbox"
+                    checked={doc.branding.showMadeWithRvnce}
+                    onChange={(event) => {
+                      const showMadeWithRvnce = event.currentTarget.checked
+                      update((profile) => ({
+                        ...profile,
+                        branding: { ...profile.branding, showMadeWithRvnce },
+                      }))
+                    }}
+                  />
+                  {t('Show Made with Rvnce')}
+                </label>
+              </div>
+            )}
+            {section === 'Links' && (
+              <div class="form-panel">
+                {doc.blocks.length === 0 && (
+                  <p class="empty-message">
+                    {t('Add a link to a site you want visitors to find.')}
+                  </p>
+                )}
+                {doc.blocks.map((block, index) => {
+                  const issue = issues.blocks[index]
+                  const label = linkLabel(block, index)
+                  return (
+                    <fieldset
+                      class="link-fieldset"
+                      key={block.id}
+                      data-link-row={block.id}
+                    >
+                      <legend>{t('Link {value}', { value: index + 1 })}</legend>
+                      <div class="link-tools">
+                        <button
+                          class="icon-button"
+                          id={'move-up-' + block.id}
+                          disabled={index === 0}
+                          aria-label={t('Move {value} up', { value: label })}
+                          onClick={() => moveLink(block.id, -1)}
+                        >
+                          <Icon name="up" />
+                        </button>
+                        <button
+                          class="icon-button"
+                          id={'move-down-' + block.id}
+                          disabled={index === doc.blocks.length - 1}
+                          aria-label={t('Move {value} down', { value: label })}
+                          onClick={() => moveLink(block.id, 1)}
+                        >
+                          <Icon name="down" />
+                        </button>
+                        <button
+                          class="icon-button"
+                          aria-label={t('Remove {value}', { value: label })}
+                          onClick={() => removeLink(block.id)}
+                        >
+                          <Icon name="remove" />
+                        </button>
+                      </div>
+                      <label class="field">
+                        <span class="field-label">{t('Label')}</span>
+                        <input
+                          id={'label-' + block.id}
+                          value={block.label}
+                          maxLength={limits.label}
+                          aria-invalid={Boolean(issue?.label)}
+                          aria-describedby={
+                            issue?.label ? 'label-error-' + block.id : undefined
+                          }
+                          onInput={(event) =>
+                            editLink(
+                              block.id,
+                              'label',
+                              fieldValue(event.currentTarget),
+                            )
+                          }
+                        />
+                        {issue?.label && (
+                          <span
+                            class="field-error"
+                            id={'label-error-' + block.id}
+                          >
+                            {t(issue.label)}
+                          </span>
+                        )}
+                      </label>
+                      <label class="field">
+                        <span class="field-label">URL</span>
+                        <input
+                          id={'url-' + block.id}
+                          type="url"
+                          value={block.url}
+                          maxLength={limits.url}
+                          placeholder="https://example.com"
+                          aria-invalid={Boolean(issue?.url)}
+                          aria-describedby={
+                            issue?.url ? 'url-error-' + block.id : undefined
+                          }
+                          onInput={(event) =>
+                            editLink(
+                              block.id,
+                              'url',
+                              fieldValue(event.currentTarget),
+                            )
+                          }
+                        />
+                        {issue?.url && (
+                          <span
+                            class="field-error"
+                            id={'url-error-' + block.id}
+                          >
+                            {t(issue.url)}
+                          </span>
+                        )}
+                      </label>
+                    </fieldset>
+                  )
+                })}
+                <button
+                  id="add-link"
+                  class="button button-outline add-link"
+                  disabled={doc.blocks.length >= limits.blocks}
+                  onClick={addLink}
+                >
+                  <Icon name="plus" /> {t('Add link')}
+                </button>
+                {doc.blocks.length >= limits.blocks && (
+                  <p class="empty-message">
+                    {t('This profile has the maximum of {value} links.', {
+                      value: limits.blocks,
+                    })}
+                  </p>
                 )}
               </div>
-              <label class="appearance-check">
-                <input
-                  type="checkbox"
-                  checked={doc.branding.showMadeWithRvnce}
-                  onChange={(event) => {
-                    const showMadeWithRvnce = event.currentTarget.checked
-                    update((profile) => ({
-                      ...profile,
-                      branding: { showMadeWithRvnce },
-                    }))
-                  }}
-                />
-                Show Made with Rvnce
-              </label>
-            </div>
-          )}
-          {section === 'Links' && (
-            <div class="form-panel">
-              {doc.blocks.length === 0 && (
-                <p class="empty-message">
-                  Add a link to a site you want visitors to find.
-                </p>
-              )}
-              {doc.blocks.map((block, index) => {
-                const issue = issues.blocks[index]
-                const label = linkLabel(block, index)
-                return (
-                  <fieldset class="link-fieldset" key={block.id}>
-                    <legend>{'Link ' + (index + 1)}</legend>
-                    <div class="link-tools">
-                      <button
-                        class="icon-button"
-                        id={'move-up-' + block.id}
-                        disabled={index === 0}
-                        aria-label={'Move ' + label + ' up'}
-                        onClick={() => moveLink(block.id, -1)}
-                      >
-                        <Icon name="up" />
-                      </button>
-                      <button
-                        class="icon-button"
-                        id={'move-down-' + block.id}
-                        disabled={index === doc.blocks.length - 1}
-                        aria-label={'Move ' + label + ' down'}
-                        onClick={() => moveLink(block.id, 1)}
-                      >
-                        <Icon name="down" />
-                      </button>
-                      <button
-                        class="icon-button"
-                        aria-label={'Remove ' + label}
-                        onClick={() => removeLink(block.id)}
-                      >
-                        <Icon name="remove" />
-                      </button>
-                    </div>
-                    <label class="field">
-                      <span class="field-label">Label</span>
-                      <input
-                        id={'label-' + block.id}
-                        value={block.label}
-                        maxLength={limits.label}
-                        aria-invalid={Boolean(issue?.label)}
-                        aria-describedby={
-                          issue?.label ? 'label-error-' + block.id : undefined
-                        }
-                        onInput={(event) =>
-                          editLink(
-                            block.id,
-                            'label',
-                            fieldValue(event.currentTarget),
-                          )
-                        }
-                      />
-                      {issue?.label && (
-                        <span
-                          class="field-error"
-                          id={'label-error-' + block.id}
-                        >
-                          {issue.label}
-                        </span>
-                      )}
-                    </label>
-                    <label class="field">
-                      <span class="field-label">URL</span>
-                      <input
-                        id={'url-' + block.id}
-                        type="url"
-                        value={block.url}
-                        maxLength={limits.url}
-                        placeholder="https://example.com"
-                        aria-invalid={Boolean(issue?.url)}
-                        aria-describedby={
-                          issue?.url ? 'url-error-' + block.id : undefined
-                        }
-                        onInput={(event) =>
-                          editLink(
-                            block.id,
-                            'url',
-                            fieldValue(event.currentTarget),
-                          )
-                        }
-                      />
-                      {issue?.url && (
-                        <span class="field-error" id={'url-error-' + block.id}>
-                          {issue.url}
-                        </span>
-                      )}
-                    </label>
-                  </fieldset>
-                )
-              })}
-              <button
-                id="add-link"
-                class="button button-outline add-link"
-                disabled={doc.blocks.length >= limits.blocks}
-                onClick={addLink}
-              >
-                <Icon name="plus" /> Add link
-              </button>
-              {doc.blocks.length >= limits.blocks && (
-                <p class="empty-message">
-                  This profile has the maximum of {limits.blocks} links.
-                </p>
-              )}
-            </div>
-          )}
-          {section === 'Appearance' && (
-            <AppearanceEditor
-              appearance={doc.appearance}
-              update={updateAppearance}
-              replace={(edit) => updateAppearance(edit, true)}
-              undo={undoAppearance}
-              canUndo={priorAppearance !== null}
-            />
-          )}
+            )}
+            {section === 'Appearance' && (
+              <AppearanceEditor
+                appearance={doc.appearance}
+                update={updateAppearance}
+                replace={(edit) => updateAppearance(edit, true)}
+                undo={undoAppearance}
+                canUndo={priorAppearance !== null}
+              />
+            )}
+          </div>
         </section>
-        <section class="preview-pane" aria-labelledby="preview-title">
-          <div class="preview-toolbar">
-            <h2 id="preview-title">Live preview</h2>
-            <div class="preview-tools">
-              <div
-                class="device-controls"
-                role="group"
-                aria-label="Preview width"
-              >
+        <section
+          class="preview-pane"
+          id="preview-pane"
+          ref={previewPane}
+          aria-labelledby="preview-title"
+          inert={!previewShown}
+          data-device={previewMobileDevice}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !event.defaultPrevented && !mobile)
+              closeDesktopPreview()
+          }}
+        >
+          <div class="preview-window">
+            <div class="preview-toolbar">
+              <div class="preview-heading">
                 <button
-                  class="icon-button"
-                  title="Wide preview"
-                  aria-label="Wide preview"
-                  aria-pressed={device === 'wide'}
-                  onClick={() => setDevice('wide')}
+                  type="button"
+                  ref={previewGrip}
+                  class="icon-button preview-grip"
+                  aria-label={t('Move preview')}
+                  aria-describedby="preview-move-help"
+                  title={t('Move preview')}
+                  {...previewGesture}
                 >
-                  <Icon name="monitor" />
+                  <Icon name="grip" />
                 </button>
-                <button
-                  class="icon-button"
-                  title="Phone preview"
-                  aria-label="Phone preview"
-                  aria-pressed={device === 'phone'}
-                  onClick={() => setDevice('phone')}
+                <span class="visually-hidden" id="preview-move-help">
+                  {t(
+                    'Drag or use the arrow keys to move. Press Home to reset the position.',
+                  )}
+                </span>
+                <h2 id="preview-title">{t('Live preview')}</h2>
+              </div>
+              <div class="preview-tools">
+                <div
+                  class="device-controls"
+                  role="group"
+                  aria-label={t('Preview width')}
                 >
-                  <Icon name="phone" />
+                  <button
+                    class="icon-button"
+                    title={t('Wide preview')}
+                    aria-label={t('Wide preview')}
+                    aria-pressed={device === 'wide'}
+                    onClick={() => setDevice('wide')}
+                  >
+                    <Icon name="monitor" />
+                  </button>
+                  <button
+                    class="icon-button"
+                    title={t('Phone preview')}
+                    aria-label={t('Phone preview')}
+                    aria-pressed={device === 'phone'}
+                    onClick={() => setDevice('phone')}
+                  >
+                    <Icon name="phone" />
+                  </button>
+                </div>
+                <details
+                  class="example-menu"
+                  ref={examplesMenu}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && event.currentTarget.open) {
+                      event.preventDefault()
+                      event.currentTarget.open = false
+                      event.currentTarget.querySelector('summary')?.focus()
+                    }
+                  }}
+                >
+                  <summary>
+                    {t('Examples')}
+                    <Icon name="down" />
+                  </summary>
+                  <ul>
+                    {examples.map(({ preset, title }) => (
+                      <li key={preset}>
+                        <a
+                          href={
+                            './demo/' +
+                            (preset === 'graphic' ? '' : preset + '/') +
+                            'index.html'
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {t(title)} <Icon name="external" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+                <button
+                  type="button"
+                  class="icon-button preview-close"
+                  aria-label={t('Close preview')}
+                  title={t('Close preview')}
+                  onClick={closeDesktopPreview}
+                >
+                  <Icon name="close" />
                 </button>
               </div>
-              <details class="example-menu">
-                <summary>Examples</summary>
-                <ul>
-                  {examples.map(({ preset, title }) => (
-                    <li key={preset}>
-                      <a
-                        href={
-                          './demo/' +
-                          (preset === 'graphic' ? '' : preset + '/') +
-                          'index.html'
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {title} <Icon name="external" />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </details>
             </div>
-          </div>
-          <div class="preview-frame profile-viewport" data-device={device}>
-            <PublicProfile
-              doc={previewDoc}
-              assets={{ avatarUrl: avatar, ...previewMedia }}
-              preview
-            />
+            <div
+              class="preview-frame"
+              data-device={previewMobileDevice}
+              ref={previewFrame}
+            >
+              <div class="preview-bar" aria-hidden="true">
+                <span class="preview-tab">
+                  {favicon ? (
+                    <img src={favicon} alt="" width="16" height="16" />
+                  ) : (
+                    <Icon name="file" />
+                  )}
+                  <bdi>{doc.profile.name.trim() || t('Your name')}</bdi>
+                </span>
+              </div>
+              <div
+                class="preview-scroll profile-viewport"
+                role="region"
+                aria-label={t('Live preview')}
+                tabIndex={0}
+              >
+                <PublicProfile
+                  doc={previewDoc}
+                  assets={{ avatarUrl: avatar, ...previewMedia }}
+                  preview
+                  previewLabels={{
+                    locale,
+                    name: t('Your name'),
+                    links: t('Profile links'),
+                    credit: t('Made with Rvnce'),
+                    playBackground: t('Play background'),
+                    stopBackground: t('Stop background'),
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -797,34 +1212,33 @@ export function Editor({
         aria-labelledby="import-title"
         onClose={() => setPendingImport(null)}
       >
-        {pendingImport && (
-          <>
-            <h2 id="import-title">Replace current profile?</h2>
-            <p>
-              This will replace your draft with{' '}
-              <strong>
-                {pendingImport.profile.name.trim() || 'an unnamed profile'}
-              </strong>
-              . Export the current draft first if you need a copy.
-            </p>
-            <div class="dialog-actions">
-              <button
-                class="button button-outline"
-                autoFocus
-                onClick={() => dialog.current?.close()}
-              >
-                Cancel
-              </button>
-              <button
-                class="button button-primary"
-                onClick={() => acceptImport(pendingImport)}
-              >
-                Replace profile
-              </button>
-            </div>
-          </>
-        )}
+        <h2 id="import-title">{t('Replace current profile?')}</h2>
+        <p>
+          {t(
+            'This will replace your draft with {value}. Export the current draft first if you need a copy.',
+            {
+              value: importName || t('an unnamed profile'),
+            },
+          )}
+        </p>
+        <div class="dialog-actions">
+          <button
+            class="button button-outline"
+            autoFocus
+            onClick={() => dialog.current?.close()}
+          >
+            {t('Cancel')}
+          </button>
+          <button
+            class="button button-primary"
+            onClick={() => {
+              if (pendingImport) acceptImport(pendingImport)
+            }}
+          >
+            {t('Replace profile')}
+          </button>
+        </div>
       </dialog>
-    </>
+    </CopyContext.Provider>
   )
 }

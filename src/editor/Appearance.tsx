@@ -18,6 +18,9 @@ import { bytesOf } from '../profile/media'
 import { contrastRatio } from '../profile/colors'
 import { loadBackground, loadVideoPoster } from './background-files'
 import { download, importTheme } from './files'
+import { Icon } from './Icon'
+import type { Message } from './messages'
+import { errorCopy, useCopy } from './preferences'
 
 type ChangeAppearance = (edit: (value: Appearance) => Appearance) => void
 
@@ -32,17 +35,42 @@ const presetLabels = {
   glass: 'Glass',
   neon: 'Neon',
   graphic: 'Graphic',
-}
+} as const
+
+const optionLabels = {
+  color: 'Color',
+  linear: 'Linear',
+  radial: 'Radial',
+  media: 'Media',
+  cover: 'Cover',
+  contain: 'Contain',
+  start: 'Start',
+  center: 'Center',
+  end: 'End',
+  above: 'Above',
+  circle: 'Circle',
+  rounded: 'Rounded',
+  square: 'Square',
+  graphic: 'Graphic',
+  solid: 'Solid',
+  outline: 'Outline',
+  soft: 'Soft',
+  deep: 'Deep',
+  none: 'None',
+  lift: 'Lift',
+  slide: 'Slide',
+} as const satisfies Record<string, Message>
 
 function Reset({ name, onClick }: { name: string; onClick: () => void }) {
+  const t = useCopy()
   return (
     <button
       type="button"
       class="appearance-reset"
-      aria-label={'Reset ' + name}
+      aria-label={t('Reset {value}', { value: name })}
       onClick={onClick}
     >
-      Reset
+      {t('Reset')}
     </button>
   )
 }
@@ -116,21 +144,22 @@ function Color({
   )
 }
 
-function Choice<const T extends string>({
+function Choice<
+  const T extends keyof typeof optionLabels | keyof typeof fontLabels,
+>({
   label,
   value,
   values,
-  labels,
   change,
   reset,
 }: {
   label: string
   value: T
   values: readonly T[]
-  labels?: Partial<Record<T, string>>
   change: (value: T) => void
   reset: () => void
 }) {
+  const t = useCopy()
   return (
     <div class="appearance-field">
       <label>
@@ -146,7 +175,9 @@ function Choice<const T extends string>({
         >
           {values.map((item) => (
             <option key={item} value={item}>
-              {labels?.[item] ?? item[0]!.toUpperCase() + item.slice(1)}
+              {item in fontLabels
+                ? fontLabels[item as keyof typeof fontLabels]
+                : t(optionLabels[item as keyof typeof optionLabels])}
             </option>
           ))}
         </select>
@@ -175,11 +206,12 @@ export function AppearanceEditor({
   undo: () => void
   canUndo: boolean
 }) {
+  const t = useCopy()
   const { preset, variant, background, typography, card, links } = appearance
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<Message | ''>('')
   const [loading, setLoading] = useState(false)
   const [pendingVideo, setPendingVideo] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<{ cause: unknown } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const posterInput = useRef<HTMLInputElement>(null)
   const themeInput = useRef<HTMLInputElement>(null)
@@ -230,7 +262,7 @@ export function AppearanceEditor({
   function clearOperation() {
     operation.current++
     setLoading(false)
-    setError('')
+    setError(null)
     setStatus('')
     setPendingVideo(null)
   }
@@ -277,7 +309,7 @@ export function AppearanceEditor({
     category: 'background' | 'poster' | 'theme',
   ) {
     const id = ++operation.current
-    setError('')
+    setError(null)
     setStatus('')
     setLoading(true)
     if (category !== 'poster') setPendingVideo(null)
@@ -316,12 +348,7 @@ export function AppearanceEditor({
       )
       setPendingVideo(null)
     } catch (failure) {
-      if (operation.current === id)
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : 'The file could not be opened.',
-        )
+      if (operation.current === id) setError({ cause: failure })
     } finally {
       if (operation.current === id) setLoading(false)
     }
@@ -383,7 +410,7 @@ export function AppearanceEditor({
   return (
     <div class="appearance-editor">
       <fieldset class="appearance-fieldset">
-        <legend>Presets</legend>
+        <legend>{t('Presets')}</legend>
         <div class="preset-options">
           {presetNames.map((name) => (
             <button
@@ -399,13 +426,13 @@ export function AppearanceEditor({
                 <i />
                 <i />
               </span>
-              {presetLabels[name]}
+              {t(presetLabels[name])}
             </button>
           ))}
         </div>
       </fieldset>
       <fieldset class="appearance-fieldset">
-        <legend>Palette</legend>
+        <legend>{t('Palette')}</legend>
         <div class="theme-options">
           {variants.map((value) => (
             <label class="theme-option" key={value}>
@@ -415,7 +442,7 @@ export function AppearanceEditor({
                 checked={variant === value}
                 onChange={() => applyVariant(value)}
               />
-              {value === 'light' ? 'Light' : 'Dark'}
+              {t(value === 'light' ? 'Light' : 'Dark')}
             </label>
           ))}
         </div>
@@ -426,14 +453,14 @@ export function AppearanceEditor({
           class="button button-outline"
           onClick={() => themeInput.current?.click()}
         >
-          Import theme
+          {t('Import theme')}
         </button>
         <button
           type="button"
           class="button button-outline"
           onClick={exportTheme}
         >
-          Export theme
+          {t('Export theme')}
           {mediaSize >= 1024 ** 2 &&
             ' · ' + friendlySize(Math.ceil((mediaSize * 4) / 3))}
         </button>
@@ -441,7 +468,7 @@ export function AppearanceEditor({
           ref={themeInput}
           type="file"
           accept=".json"
-          aria-label="Theme file"
+          aria-label={t('Theme file')}
           hidden
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]
@@ -450,23 +477,28 @@ export function AppearanceEditor({
           }}
         />
       </div>
-      {loading && <p role="status">Reading file…</p>}
-      {status && <p role="status">{status}</p>}
+      {loading && <p role="status">{t('Reading file…')}</p>}
+      {status && <p role="status">{t(status)}</p>}
       {error && (
         <p class="field-error" role="alert">
-          {error}
+          {errorCopy(t, error.cause, 'The file could not be opened.')}
         </p>
       )}
       {lowContrast && (
         <p class="field-error">
-          Some text colors have low contrast. Choose a lighter or darker color.
+          {t(
+            'Some text colors have low contrast. Choose a lighter or darker color.',
+          )}
         </p>
       )}
       <details class="appearance-group" open>
-        <summary>Background</summary>
+        <summary>
+          {t('Background')}
+          <Icon name="down" />
+        </summary>
         <div class="appearance-fields">
           <Choice
-            label="Background type"
+            label={t('Background type')}
             value={background.kind}
             values={media ? backgroundKinds : ['color', 'linear', 'radial']}
             change={(kind) => {
@@ -483,21 +515,21 @@ export function AppearanceEditor({
             reset={() => resetGroup('background')}
           />
           {color(
-            'Background color',
+            t('Background color'),
             background.color,
             (value) => setBackground('color', value),
             () => setBackground('color', defaults.background.color),
           )}
           {(background.kind === 'linear' || background.kind === 'radial') &&
             color(
-              'Gradient color',
+              t('Gradient color'),
               background.endColor,
               (value) => setBackground('endColor', value),
               () => setBackground('endColor', defaults.background.endColor),
             )}
           {background.kind === 'linear' &&
             range(
-              'Gradient angle',
+              t('Gradient angle'),
               background.angle,
               ranges.angle,
               (value) => setBackground('angle', value),
@@ -507,7 +539,7 @@ export function AppearanceEditor({
           {(media || background.kind === 'radial') && (
             <>
               {range(
-                'Horizontal position',
+                t('Horizontal position'),
                 background.x,
                 ranges.percent,
                 (value) => setBackground('x', value),
@@ -515,7 +547,7 @@ export function AppearanceEditor({
                 '%',
               )}
               {range(
-                'Vertical position',
+                t('Vertical position'),
                 background.y,
                 ranges.percent,
                 (value) => setBackground('y', value),
@@ -527,14 +559,14 @@ export function AppearanceEditor({
           {media && (
             <>
               <Choice
-                label="Image fit"
+                label={t('Image fit')}
                 value={background.fit}
                 values={fits}
                 change={(value) => setBackground('fit', value)}
                 reset={() => setBackground('fit', defaults.background.fit)}
               />
               {range(
-                'Scale',
+                t('Scale'),
                 background.scale,
                 ranges.scale,
                 (value) => setBackground('scale', value),
@@ -542,7 +574,7 @@ export function AppearanceEditor({
                 '%',
               )}
               {range(
-                'Dimming',
+                t('Dimming'),
                 background.dim,
                 ranges.percent,
                 (value) => setBackground('dim', value),
@@ -550,7 +582,7 @@ export function AppearanceEditor({
                 '%',
               )}
               {range(
-                'Background blur',
+                t('Background blur'),
                 background.blur,
                 ranges.blur,
                 (value) => setBackground('blur', value),
@@ -565,7 +597,7 @@ export function AppearanceEditor({
               class="button button-outline"
               onClick={() => fileInput.current?.click()}
             >
-              {media ? 'Change background file' : 'Upload background'}
+              {t(media ? 'Change background file' : 'Upload background')}
             </button>
             {media && (
               <button
@@ -573,14 +605,14 @@ export function AppearanceEditor({
                 class="button button-quiet"
                 onClick={removeMedia}
               >
-                Remove background file
+                {t('Remove background file')}
               </button>
             )}
             <input
               ref={fileInput}
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,video/mp4"
-              aria-label="Background file"
+              aria-label={t('Background file')}
               hidden
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0]
@@ -596,20 +628,20 @@ export function AppearanceEditor({
                 class="button button-outline"
                 onClick={() => posterInput.current?.click()}
               >
-                Upload video poster
+                {t('Upload video poster')}
               </button>
               <button
                 type="button"
                 class="button button-quiet"
                 onClick={clearOperation}
               >
-                Cancel video upload
+                {t('Cancel video upload')}
               </button>
               <input
                 ref={posterInput}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                aria-label="Video poster file"
+                aria-label={t('Video poster file')}
                 hidden
                 onChange={(event) => {
                   const file = event.currentTarget.files?.[0]
@@ -623,40 +655,46 @@ export function AppearanceEditor({
             <p class="hint">
               {friendlySize(mediaSize)}
               {'poster' in media &&
-                ' · Original motion files retain metadata. MP4 files may contain audio.'}
+                ' · ' +
+                  t(
+                    'Original motion files retain metadata. MP4 files may contain audio.',
+                  )}
             </p>
           ) : (
             <p class="hint">
-              PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8
-              MiB and 15 seconds.
+              {t(
+                'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB and 15 seconds.',
+              )}
             </p>
           )}
           <Reset
-            name="Background group"
+            name={t('Background group')}
             onClick={() => resetGroup('background')}
           />
         </div>
       </details>
       <details class="appearance-group">
-        <summary>Typography</summary>
+        <summary>
+          {t('Typography')}
+          <Icon name="down" />
+        </summary>
         <div class="appearance-fields">
           <Choice
-            label="Font"
+            label={t('Font')}
             value={typography.font}
             values={fontNames}
-            labels={fontLabels}
             change={(value) => setTypography('font', value)}
             reset={() => setTypography('font', defaults.typography.font)}
           />
           <Choice
-            label="Text alignment"
+            label={t('Text alignment')}
             value={typography.align}
             values={positions}
             change={(value) => setTypography('align', value)}
             reset={() => setTypography('align', defaults.typography.align)}
           />
           {range(
-            'Name size',
+            t('Name size'),
             typography.nameSize,
             ranges.nameSize,
             (value) => setTypography('nameSize', value),
@@ -664,20 +702,20 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Name weight',
+            t('Name weight'),
             typography.nameWeight,
             ranges.weight,
             (value) => setTypography('nameWeight', value),
             () => setTypography('nameWeight', defaults.typography.nameWeight),
           )}
           {color(
-            'Name color',
+            t('Name color'),
             typography.color,
             (value) => setTypography('color', value),
             () => setTypography('color', defaults.typography.color),
           )}
           {range(
-            'Bio size',
+            t('Bio size'),
             typography.bioSize,
             ranges.bioSize,
             (value) => setTypography('bioSize', value),
@@ -685,29 +723,32 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Bio weight',
+            t('Bio weight'),
             typography.bioWeight,
             ranges.weight,
             (value) => setTypography('bioWeight', value),
             () => setTypography('bioWeight', defaults.typography.bioWeight),
           )}
           {color(
-            'Bio color',
+            t('Bio color'),
             typography.bioColor,
             (value) => setTypography('bioColor', value),
             () => setTypography('bioColor', defaults.typography.bioColor),
           )}
           <Reset
-            name="Typography group"
+            name={t('Typography group')}
             onClick={() => resetGroup('typography')}
           />
         </div>
       </details>
       <details class="appearance-group">
-        <summary>Card and avatar</summary>
+        <summary>
+          {t('Card and avatar')}
+          <Icon name="down" />
+        </summary>
         <div class="appearance-fields">
           {range(
-            'Card width',
+            t('Card width'),
             card.width,
             ranges.width,
             (value) => setCard('width', value),
@@ -715,7 +756,7 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Card padding',
+            t('Card padding'),
             card.padding,
             ranges.padding,
             (value) => setCard('padding', value),
@@ -723,13 +764,13 @@ export function AppearanceEditor({
             ' px',
           )}
           {color(
-            'Card color',
+            t('Card color'),
             card.color,
             (value) => setCard('color', value),
             () => setCard('color', defaults.card.color),
           )}
           {range(
-            'Card opacity',
+            t('Card opacity'),
             card.opacity,
             ranges.percent,
             (value) => setCard('opacity', value),
@@ -737,7 +778,7 @@ export function AppearanceEditor({
             '%',
           )}
           {range(
-            'Card radius',
+            t('Card radius'),
             card.radius,
             ranges.radius,
             (value) => setCard('radius', value),
@@ -745,7 +786,7 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Card backdrop blur',
+            t('Card backdrop blur'),
             card.blur,
             ranges.blur,
             (value) => setCard('blur', value),
@@ -753,7 +794,7 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Card border',
+            t('Card border'),
             card.border,
             ranges.border,
             (value) => setCard('border', value),
@@ -761,35 +802,35 @@ export function AppearanceEditor({
             ' px',
           )}
           {color(
-            'Card border color',
+            t('Card border color'),
             card.borderColor,
             (value) => setCard('borderColor', value),
             () => setCard('borderColor', defaults.card.borderColor),
           )}
           <Choice
-            label="Card shadow"
+            label={t('Card shadow')}
             value={card.shadow}
             values={shadows}
             change={(value) => setCard('shadow', value)}
             reset={() => setCard('shadow', defaults.card.shadow)}
           />
-          <Reset name="Card group" onClick={() => resetGroup('card')} />
+          <Reset name={t('Card group')} onClick={() => resetGroup('card')} />
           <Choice
-            label="Avatar position"
+            label={t('Avatar position')}
             value={appearance.avatar.position}
             values={['above', 'start', 'end']}
             change={(value) => setAvatar('position', value)}
             reset={() => setAvatar('position', defaults.avatar.position)}
           />
           <Choice
-            label="Avatar shape"
+            label={t('Avatar shape')}
             value={appearance.avatar.shape}
             values={avatarShapes}
             change={(value) => setAvatar('shape', value)}
             reset={() => setAvatar('shape', defaults.avatar.shape)}
           />
           {range(
-            'Avatar size',
+            t('Avatar size'),
             appearance.avatar.size,
             ranges.avatarSize,
             (value) => setAvatar('size', value),
@@ -797,14 +838,14 @@ export function AppearanceEditor({
             ' px',
           )}
           {color(
-            'Accent color',
+            t('Accent color'),
             appearance.accent,
             (value) => update((current) => ({ ...current, accent: value })),
             () =>
               update((current) => ({ ...current, accent: defaults.accent })),
           )}
           <Reset
-            name="Avatar group"
+            name={t('Avatar group')}
             onClick={() => {
               resetGroup('avatar')
               update((current) => ({ ...current, accent: defaults.accent }))
@@ -813,29 +854,32 @@ export function AppearanceEditor({
         </div>
       </details>
       <details class="appearance-group">
-        <summary>Link style</summary>
+        <summary>
+          {t('Link style')}
+          <Icon name="down" />
+        </summary>
         <div class="appearance-fields">
           <Choice
-            label="Link style"
+            label={t('Link style')}
             value={links.style}
             values={linkStyles}
             change={(value) => setLinks('style', value)}
             reset={() => setLinks('style', defaults.links.style)}
           />
           {color(
-            'Link color',
+            t('Link color'),
             links.color,
             (value) => setLinks('color', value),
             () => setLinks('color', defaults.links.color),
           )}
           {color(
-            'Link text color',
+            t('Link text color'),
             links.text,
             (value) => setLinks('text', value),
             () => setLinks('text', defaults.links.text),
           )}
           {range(
-            'Link radius',
+            t('Link radius'),
             links.radius,
             ranges.radius,
             (value) => setLinks('radius', value),
@@ -843,7 +887,7 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Link border',
+            t('Link border'),
             links.border,
             ranges.border,
             (value) => setLinks('border', value),
@@ -851,20 +895,20 @@ export function AppearanceEditor({
             ' px',
           )}
           {color(
-            'Link border color',
+            t('Link border color'),
             links.borderColor,
             (value) => setLinks('borderColor', value),
             () => setLinks('borderColor', defaults.links.borderColor),
           )}
           <Choice
-            label="Link shadow"
+            label={t('Link shadow')}
             value={links.shadow}
             values={shadows}
             change={(value) => setLinks('shadow', value)}
             reset={() => setLinks('shadow', defaults.links.shadow)}
           />
           {range(
-            'Link height',
+            t('Link height'),
             links.height,
             ranges.linkHeight,
             (value) => setLinks('height', value),
@@ -872,7 +916,7 @@ export function AppearanceEditor({
             ' px',
           )}
           {range(
-            'Link spacing',
+            t('Link spacing'),
             links.gap,
             ranges.gap,
             (value) => setLinks('gap', value),
@@ -880,13 +924,13 @@ export function AppearanceEditor({
             ' px',
           )}
           <Choice
-            label="Link hover effect"
+            label={t('Link hover effect')}
             value={links.hover}
             values={hoverStyles}
             change={(value) => setLinks('hover', value)}
             reset={() => setLinks('hover', defaults.links.hover)}
           />
-          <Reset name="Link group" onClick={() => resetGroup('links')} />
+          <Reset name={t('Link group')} onClick={() => resetGroup('links')} />
         </div>
       </details>
       <label class="appearance-check">
@@ -898,7 +942,7 @@ export function AppearanceEditor({
             update((current) => ({ ...current, entrance }))
           }}
         />
-        Animate profile entrance
+        {t('Animate profile entrance')}
       </label>
       <div class="appearance-actions">
         {canUndo && (
@@ -910,7 +954,7 @@ export function AppearanceEditor({
               undo()
             }}
           >
-            Undo appearance change
+            {t('Undo appearance change')}
           </button>
         )}
         <button
@@ -918,7 +962,7 @@ export function AppearanceEditor({
           class="button button-quiet"
           onClick={() => resetDialog.current?.showModal()}
         >
-          Reset appearance
+          {t('Reset appearance')}
         </button>
       </div>
       <dialog
@@ -926,8 +970,8 @@ export function AppearanceEditor({
         class="import-dialog"
         aria-labelledby="reset-title"
       >
-        <h2 id="reset-title">Reset appearance?</h2>
-        <p>Your profile will use the default Minimal preset.</p>
+        <h2 id="reset-title">{t('Reset appearance?')}</h2>
+        <p>{t('Your profile will use the default Minimal preset.')}</p>
         <div class="dialog-actions">
           <button
             type="button"
@@ -935,7 +979,7 @@ export function AppearanceEditor({
             autoFocus
             onClick={() => resetDialog.current?.close()}
           >
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             type="button"
@@ -945,7 +989,7 @@ export function AppearanceEditor({
               resetDialog.current?.close()
             }}
           >
-            Reset to Minimal
+            {t('Reset to Minimal')}
           </button>
         </div>
       </dialog>

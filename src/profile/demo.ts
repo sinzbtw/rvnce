@@ -3,17 +3,17 @@ import type { LinkBlock, ProfileDocument } from './document'
 
 export function newProfile(): ProfileDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     profile: { name: '', bio: '', avatar: null, language: 'en' },
     appearance: presetAppearance('minimal'),
-    branding: { showMadeWithRvnce: true },
+    branding: { showMadeWithRvnce: true, favicon: null },
     blocks: [],
   }
 }
 
 interface Example {
   preset: PresetName
-  title: string
+  title: 'Graphic' | 'Minimal' | 'Midnight' | 'Glass' | 'Neon'
   name: string
   bio: string
   links: readonly (readonly [string, string])[]
