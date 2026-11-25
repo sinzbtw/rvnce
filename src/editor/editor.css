@@ -461,6 +461,7 @@ fieldset legend {
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   min-width: 0;
@@ -820,7 +821,8 @@ fieldset legend {
   overflow-wrap: anywhere;
 }
 
-.appearance-dialog-openers {
+.appearance-dialog-openers,
+.link-editor-group {
   display: grid;
   gap: 12px;
 }
@@ -936,6 +938,20 @@ fieldset legend {
 
 .accessory-upload p {
   margin-block: 6px 0;
+}
+
+.link-editor-group h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.link-icon-sample {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 @media (max-width: 620px) {

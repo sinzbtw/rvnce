@@ -126,6 +126,9 @@ export async function importProfile(file: File): Promise<ProfileDocument> {
     checkImportedPng(doc.profile.avatar, false),
     checkImportedPng(doc.branding.favicon, true),
     checkImportedAccessory(doc.appearance.effects.cursor.image, 'cursor'),
+    ...doc.blocks.flatMap((link) =>
+      link.type === 'icon' ? [checkImportedAccessory(link.image, 'icon')] : [],
+    ),
     checkImportedBackground(doc.appearance.background.media),
   ])
   return doc
@@ -153,7 +156,11 @@ async function checkImportedAccessory(encoded: string | null, kind: Accessory) {
     )
     image.close()
   } catch {
-    throw new Error('The custom cursor is not a supported PNG.')
+    throw new Error(
+      kind === 'cursor'
+        ? 'The custom cursor is not a supported PNG.'
+        : 'The custom link icon is not a supported PNG.',
+    )
   }
 }
 

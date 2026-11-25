@@ -7,6 +7,24 @@ export const trails = ['none', 'ghost', 'sparkles'] as const
 export const overlays = ['none', 'snow', 'particles', 'grain'] as const
 export const clicks = ['none', 'ripple', 'burst', 'sparkles'] as const
 export const namePresets = ['glow', 'gradient'] as const
+export const socialIcons = [
+  'auto',
+  'website',
+  'github',
+  'instagram',
+  'youtube',
+  'telegram',
+  'discord',
+  'twitch',
+  'tiktok',
+  'linkedin',
+  'x',
+  'custom',
+] as const
+
+export type SocialIcon = (typeof socialIcons)[number]
+export type BuiltInIcon = Exclude<SocialIcon, 'auto' | 'custom'>
+
 export interface ProfileEffects {
   cursor: { preset: (typeof cursors)[number]; image: string | null }
   trail: (typeof trails)[number]
@@ -31,11 +49,14 @@ export function defaultEffects(accent: string): ProfileEffects {
   }
 }
 
-export const accessoryEdges = { cursor: 32 } as const
+export const accessoryEdges = { cursor: 32, icon: 64 } as const
 export type Accessory = keyof typeof accessoryEdges
 
 export function accessoryBytes(encoded: unknown, kind: Accessory) {
-  const invalid = 'The custom cursor is not a supported PNG.'
+  const invalid =
+    kind === 'cursor'
+      ? 'The custom cursor is not a supported PNG.'
+      : 'The custom link icon is not a supported PNG.'
   const edge = accessoryEdges[kind]
   const max = 32 * 1024
   if (
@@ -98,4 +119,31 @@ export function parseEffects(value: unknown): ProfileEffects {
     throw new Error(invalid)
   if (cursor.image !== null) accessoryBytes(cursor.image, 'cursor')
   return value as unknown as ProfileEffects
+}
+
+const sites: Record<Exclude<BuiltInIcon, 'website'>, readonly string[]> = {
+  github: ['github.com'],
+  instagram: ['instagram.com'],
+  youtube: ['youtube.com', 'youtu.be'],
+  telegram: ['telegram.me', 't.me', 'telegram.org'],
+  discord: ['discord.com', 'discord.gg'],
+  twitch: ['twitch.tv'],
+  tiktok: ['tiktok.com'],
+  linkedin: ['linkedin.com'],
+  x: ['x.com', 'twitter.com'],
+}
+
+export function iconForUrl(url: string): BuiltInIcon {
+  try {
+    const { hostname } = new URL(url)
+    for (const [icon, hosts] of Object.entries(sites)) {
+      if (
+        hosts.some((host) => hostname === host || hostname.endsWith('.' + host))
+      )
+        return icon as BuiltInIcon
+    }
+  } catch {
+    // Incomplete URLs are allowed in draft links.
+  }
+  return 'website'
 }
