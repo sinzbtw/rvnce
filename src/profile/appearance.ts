@@ -1,4 +1,5 @@
 import { validateBackgroundMedia, type BackgroundMedia } from './media'
+import { defaultEffects, parseEffects, type ProfileEffects } from './effects'
 import { hasKeys, isHex } from './shape'
 
 export const presetNames = [
@@ -77,6 +78,7 @@ export interface Appearance {
     hover: (typeof hoverStyles)[number]
   }
   entrance: boolean
+  effects: ProfileEffects
 }
 
 export const defaultAccent = '#4434d4'
@@ -300,6 +302,7 @@ export function presetAppearance(
       hover: graphic ? 'slide' : 'lift',
     },
     entrance: !graphic,
+    effects: defaultEffects(accent),
   }
 }
 
@@ -347,7 +350,7 @@ const radius = integer(...ranges.radius)
 const border = integer(...ranges.border)
 const weight = integer(...ranges.weight)
 
-export function parseAppearance(value: unknown): Appearance {
+export function parseAppearance(value: unknown, legacy = false): Appearance {
   if (
     !hasKeys(value, [
       'preset',
@@ -359,6 +362,7 @@ export function parseAppearance(value: unknown): Appearance {
       'avatar',
       'links',
       'entrance',
+      ...(legacy ? [] : ['effects']),
     ]) ||
     !member(presetNames)(value.preset) ||
     !member(variants)(value.variant) ||
@@ -422,5 +426,10 @@ export function parseAppearance(value: unknown): Appearance {
     validateBackgroundMedia(appearance.background.media)
   else if (appearance.background.media !== null)
     throw new Error('Choose a media background before adding a file.')
-  return appearance
+  return {
+    ...appearance,
+    effects: legacy
+      ? defaultEffects(appearance.accent)
+      : parseEffects(value.effects),
+  }
 }

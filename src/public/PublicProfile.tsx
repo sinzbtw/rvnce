@@ -4,12 +4,13 @@ import {
   profileLanguage,
   type ProfileDocument,
 } from '../profile/document'
-import { profileVariables } from './appearance-css'
+import { imageVariable, profileVariables } from './appearance-css'
 
 export interface ProfileAssets {
   avatarUrl: string | null
   backgroundUrl?: string | undefined
   posterUrl?: string | undefined
+  cursorUrl?: string | undefined
 }
 
 interface PreviewLabels {
@@ -43,7 +44,15 @@ export function PublicProfile({
   previewLabels?: PreviewLabels
 }) {
   const { profile, appearance, blocks } = doc
-  const { avatarUrl, backgroundUrl, posterUrl } = assets
+  const { avatarUrl, backgroundUrl, posterUrl, cursorUrl } = assets
+  const {
+    cursor,
+    trail,
+    overlay,
+    click,
+    name: nameEffect,
+    sparkles,
+  } = appearance.effects
   const media = appearance.background.media
   const motion = media && 'poster' in media && backgroundUrl && posterUrl
   const enteredName = profile.name.trim()
@@ -62,7 +71,17 @@ export function PublicProfile({
       data-hover={appearance.links.hover}
       data-align={appearance.typography.align}
       data-entrance={String(appearance.entrance)}
-      style={preview ? profileVariables(appearance) : undefined}
+      data-cursor={cursor.preset}
+      style={
+        preview
+          ? {
+              ...profileVariables(appearance),
+              ...(cursorUrl
+                ? { '--cursor-image': imageVariable(cursorUrl) }
+                : {}),
+            }
+          : undefined
+      }
       lang={language}
       dir="auto"
     >
@@ -105,13 +124,46 @@ export function PublicProfile({
           <img src={backgroundUrl} alt="" />
         </div>
       )}
+      {overlay.preset !== 'none' && (
+        <div
+          class="profile-overlay"
+          data-overlay={overlay.preset}
+          aria-hidden="true"
+        >
+          {overlay.preset !== 'grain' &&
+            Array.from({ length: 12 }, (_, index) => <i key={index} />)}
+        </div>
+      )}
+      {(click.preset !== 'none' || trail !== 'none') &&
+        h('rvnce-pointer', {
+          class: 'profile-pointer',
+          'aria-hidden': 'true',
+          'data-click': click.preset,
+          'data-trail': trail,
+        })}
       <div class="profile-card">
         <header class="profile-intro">
           <h1
             class="profile-name"
             lang={enteredName ? undefined : previewLocale}
           >
-            {name}
+            <span class="profile-name-inline">
+              <span
+                class="profile-name-text"
+                data-name-effect={
+                  nameEffect.enabled ? nameEffect.preset : undefined
+                }
+              >
+                {name}
+              </span>
+              {sparkles.enabled && (
+                <span class="profile-name-sparkles" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+            </span>
           </h1>
           <div class="profile-portrait">
             {avatarUrl ? (

@@ -13,6 +13,7 @@ import {
 import { readDraft } from './editor/storage'
 import { newProfile } from './profile/demo'
 import './public/background-motion.js'
+import './public/pointer-effects.js'
 import './editor/editor.css'
 import './public/profile.css'
 

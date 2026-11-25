@@ -9,6 +9,8 @@ import {
   limits,
   parseProfile,
   parseTheme,
+  profileVersion,
+  themeVersion,
   validUrl,
 } from '../src/profile/document'
 import { checkImageSize } from '../src/profile/image-size'
@@ -46,7 +48,12 @@ describe('Rvnce profile documents', () => {
   it('rejects broken JSON, unsupported versions, oversized payloads, and unknown keys', () => {
     expect(() => parseProfile('{')).toThrow('valid JSON')
     expect(() =>
-      parseProfile(JSON.stringify({ ...demoProfile(null), schemaVersion: 5 })),
+      parseProfile(
+        JSON.stringify({
+          ...demoProfile(null),
+          schemaVersion: profileVersion + 1,
+        }),
+      ),
     ).toThrow('unsupported')
     expect(() => parseProfile('x'.repeat(limits.documentBytes + 1))).toThrow(
       'smaller',
@@ -99,7 +106,7 @@ describe('Rvnce profile documents', () => {
     const raw = JSON.stringify(legacy)
     expect(() => parseProfile(raw, 'draft')).toThrow('profile details')
     expect(parseProfile(raw, 'recover')).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: profileVersion,
       profile: { name: 'Mira', bio: 'First\nSecond', language: 'en' },
       branding: { showMadeWithRvnce: false },
     })
@@ -125,7 +132,7 @@ describe('Rvnce profile documents', () => {
     }
     const doc = parseProfile(JSON.stringify(legacy))
     expect(doc).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: profileVersion,
       profile: { language: 'ru' },
       appearance: {
         preset: 'graphic',
@@ -140,14 +147,34 @@ describe('Rvnce profile documents', () => {
     )
   })
 
-  it('migrates v3 branding and validates a standalone favicon in v4', () => {
+  it('migrates v3 branding and validates a standalone favicon', () => {
     const doc = demoProfile(null)
+    const { effects, ...legacyAppearance } = doc.appearance
     const previous = {
       ...doc,
       schemaVersion: 3,
+      appearance: legacyAppearance,
       branding: { showMadeWithRvnce: true },
     }
     expect(parseProfile(JSON.stringify(previous))).toEqual(doc)
+    expect(
+      parseProfile(
+        JSON.stringify({
+          ...doc,
+          schemaVersion: 4,
+          appearance: legacyAppearance,
+        }),
+      ).appearance.effects,
+    ).toEqual(effects)
+    expect(
+      parseTheme(
+        JSON.stringify({
+          type: 'rvnce-theme',
+          schemaVersion: 1,
+          appearance: legacyAppearance,
+        }),
+      ).appearance.effects,
+    ).toEqual(effects)
     expect(siteFiles(doc, emptyAssets)['favicon.png']).toBeUndefined()
 
     const icon = readFileSync(
@@ -176,7 +203,11 @@ describe('Rvnce profile documents', () => {
     'round-trips %s as a theme with independent settings',
     (name) => {
       const appearance = presetAppearance(name)
-      const theme = { type: 'rvnce-theme', schemaVersion: 1, appearance }
+      const theme = {
+        type: 'rvnce-theme',
+        schemaVersion: themeVersion,
+        appearance,
+      }
       expect(parseTheme(JSON.stringify(theme))).toEqual(theme)
       appearance.card.radius = 45
       expect(presetAppearance(name).card.radius).not.toBe(45)
@@ -191,6 +222,13 @@ describe('Rvnce profile documents', () => {
     { card: { opacity: -1 } },
     { avatar: { shape: 'polygon' } },
     { links: { gap: 3.5 } },
+    { effects: { click: { preset: 'unknown', color: '#ffffff' } } },
+    {
+      effects: {
+        overlay: { preset: 'snow', color: '#ffffff', intensity: 101 },
+      },
+    },
+    { effects: { cursor: { preset: 'custom', image: 'aGVsbG8=' } } },
   ])('rejects unsafe or out-of-range theme overrides %j', (override) => {
     const appearance = presetAppearance('minimal')
     const [group, edits] = Object.entries(override)[0]!
@@ -199,7 +237,7 @@ describe('Rvnce profile documents', () => {
       parseTheme(
         JSON.stringify({
           type: 'rvnce-theme',
-          schemaVersion: 1,
+          schemaVersion: themeVersion,
           appearance: { ...appearance, [group]: { ...base, ...edits } },
         }),
       ),
@@ -261,6 +299,19 @@ describe('standalone public site', () => {
     const files = siteFiles(demoProfile(null), emptyAssets)
     expect(files['avatar.png']).toBeUndefined()
     expect(files['index.html']).toContain('>S</span>')
+  })
+
+  it('loads the local pointer script only for pointer effects', () => {
+    const doc = demoProfile(null)
+    doc.appearance.effects.trail = 'ghost'
+    const assets = { ...emptyAssets, pointerScript: '/* pointer effects */' }
+    const files = siteFiles(doc, assets)
+    expect(files['index.html']).toContain('src="./pointer-effects.js"')
+    expect(files['index.html']).toContain('data-trail="ghost"')
+    expect(files['pointer-effects.js']).toBe(assets.pointerScript)
+    doc.appearance.effects.trail = 'none'
+    doc.appearance.effects.overlay.preset = 'grain'
+    expect(siteFiles(doc, assets)['pointer-effects.js']).toBeUndefined()
   })
 })
 

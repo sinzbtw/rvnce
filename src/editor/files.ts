@@ -7,6 +7,11 @@ import {
   type ProfileDocument,
 } from '../profile/document'
 import { checkImageSize } from '../profile/image-size'
+import {
+  accessoryBytes,
+  accessoryEdges,
+  type Accessory,
+} from '../profile/effects'
 
 export function pngDataUrl(encoded: string): string {
   return 'data:image/png;base64,' + encoded
@@ -33,6 +38,18 @@ export async function normalizeFavicon(file: File): Promise<string> {
   return normalizeImage(file, true)
 }
 
+export async function normalizeAccessory(
+  file: File,
+  kind: Accessory,
+): Promise<string> {
+  if (file.size > limits.uploadBytes)
+    throw new Error('Choose an image up to 4 MiB.')
+  checkImageSize(await file.arrayBuffer())
+  return encodeBlob(
+    await canvasPng(file, false, accessoryEdges[kind], 32 * 1024),
+  )
+}
+
 async function normalizeImage(file: File, favicon: boolean): Promise<string> {
   if (file.size > limits.uploadBytes)
     throw new Error('Choose an image up to 4 MiB.')
@@ -40,7 +57,12 @@ async function normalizeImage(file: File, favicon: boolean): Promise<string> {
   return encodeBlob(await canvasPng(file, favicon))
 }
 
-async function canvasPng(source: Blob, favicon = false): Promise<Blob> {
+async function canvasPng(
+  source: Blob,
+  favicon = false,
+  edge = favicon ? limits.faviconEdge : limits.avatarEdge,
+  byteLimit = favicon ? limits.faviconBytes : limits.avatarBytes,
+): Promise<Blob> {
   let image: ImageBitmap
   try {
     image = await createImageBitmap(source)
@@ -48,7 +70,6 @@ async function canvasPng(source: Blob, favicon = false): Promise<Blob> {
     throw new Error('This image could not be opened.')
   }
   try {
-    const edge = favicon ? limits.faviconEdge : limits.avatarEdge
     const fit = edge / Math.max(image.width, image.height)
     const scale = favicon ? fit : Math.min(1, fit)
     const width = Math.max(1, Math.round(image.width * scale))
@@ -68,10 +89,7 @@ async function canvasPng(source: Blob, favicon = false): Promise<Blob> {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/png'),
     )
-    if (
-      !blob ||
-      blob.size > (favicon ? limits.faviconBytes : limits.avatarBytes)
-    )
+    if (!blob || blob.size > byteLimit)
       throw new Error(
         favicon
           ? 'The resized favicon is too large.'
@@ -107,8 +125,9 @@ export async function importProfile(file: File): Promise<ProfileDocument> {
   await Promise.all([
     checkImportedPng(doc.profile.avatar, false),
     checkImportedPng(doc.branding.favicon, true),
+    checkImportedAccessory(doc.appearance.effects.cursor.image, 'cursor'),
+    checkImportedBackground(doc.appearance.background.media),
   ])
-  await checkImportedBackground(doc.appearance.background.media)
   return doc
 }
 
@@ -126,9 +145,24 @@ async function checkImportedPng(encoded: string | null, favicon: boolean) {
   }
 }
 
+async function checkImportedAccessory(encoded: string | null, kind: Accessory) {
+  if (!encoded) return
+  try {
+    const image = await createImageBitmap(
+      new Blob([accessoryBytes(encoded, kind)], { type: 'image/png' }),
+    )
+    image.close()
+  } catch {
+    throw new Error('The custom cursor is not a supported PNG.')
+  }
+}
+
 export async function importTheme(file: File) {
   const theme = parseTheme(await readJsonFile(file))
-  await checkImportedBackground(theme.appearance.background.media)
+  await Promise.all([
+    checkImportedBackground(theme.appearance.background.media),
+    checkImportedAccessory(theme.appearance.effects.cursor.image, 'cursor'),
+  ])
   return theme
 }
 

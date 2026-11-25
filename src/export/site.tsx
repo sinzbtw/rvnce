@@ -6,7 +6,8 @@ import {
   type ProfileDocument,
 } from '../profile/document'
 import { backgroundFilename, decodeBase64 } from '../profile/media'
-import { profileVariables } from '../public/appearance-css'
+import { accessoryBytes } from '../profile/effects'
+import { imageVariable, profileVariables } from '../public/appearance-css'
 import { PublicProfile } from '../public/PublicProfile'
 
 export function fontFiles(stylesheet: string): string[] {
@@ -26,6 +27,7 @@ interface SiteAssets {
   fonts: Record<string, Uint8Array>
   fontLicense: Uint8Array
   motionScript?: string | undefined
+  pointerScript?: string | undefined
   avatar?: Uint8Array | undefined
   favicon?: Uint8Array | undefined
 }
@@ -43,8 +45,16 @@ export function siteFiles(
   const media = appearance.background.media
   const filename = media && backgroundFilename(media)
   const motion = media && 'poster' in media
+  const { cursor, click, trail } = appearance.effects
+  const pointer = click.preset !== 'none' || trail !== 'none'
+  const cursorFile =
+    cursor.preset === 'custom' && cursor.image
+      ? accessoryBytes(cursor.image, 'cursor')
+      : null
   if (motion && !assets.motionScript)
     throw new Error('The background player could not be loaded.')
+  if (pointer && !assets.pointerScript)
+    throw new Error('The profile effects could not be loaded.')
   const csp = [
     "default-src 'none'",
     "style-src 'self'",
@@ -53,7 +63,7 @@ export function siteFiles(
     "base-uri 'none'",
     "form-action 'none'",
   ]
-  if (motion) csp.push("script-src 'self'")
+  if (motion || pointer) csp.push("script-src 'self'")
   if (media?.type === 'video/mp4') csp.push("media-src 'self'")
 
   const html = renderToString(
@@ -68,6 +78,7 @@ export function siteFiles(
         {favicon && <link rel="icon" type="image/png" href="./favicon.png" />}
         <link rel="stylesheet" href="./profile.css" />
         {motion && <script src="./background-motion.js" defer />}
+        {pointer && <script src="./pointer-effects.js" defer />}
       </head>
       <body class="published-page" data-variant={appearance.variant}>
         <main class="published-content profile-viewport">
@@ -89,7 +100,12 @@ export function siteFiles(
       (_, name: string) => 'url(./' + fontPath(name) + ')',
     ),
     '.published-page{' +
-      Object.entries(profileVariables(appearance))
+      Object.entries({
+        ...profileVariables(appearance),
+        ...(cursorFile
+          ? { '--cursor-image': imageVariable('./cursor.png') }
+          : {}),
+      })
         .map(([key, value]) => key + ':' + value)
         .join(';') +
       '}',
@@ -109,6 +125,8 @@ export function siteFiles(
     'fonts/OFL.txt': assets.fontLicense,
     ...(avatar ? { 'avatar.png': avatar } : {}),
     ...(favicon ? { 'favicon.png': favicon } : {}),
+    ...(cursorFile ? { 'cursor.png': cursorFile } : {}),
+    ...(pointer ? { 'pointer-effects.js': assets.pointerScript! } : {}),
     ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),
     ...(motion
       ? {
