@@ -67,6 +67,10 @@ export function profileVariables(
     '--bio-weight': String(typography.bioWeight),
     '--name-color': typography.color,
     '--bio-color': typography.bioColor,
+    '--overlay-color': appearance.effects.overlay.color,
+    '--overlay-opacity': String(appearance.effects.overlay.intensity / 400),
+    '--click-color': appearance.effects.click.color,
+    '--sparkle-color': appearance.effects.sparkles.color,
     '--profile-align': typography.align,
     '--card-width': card.width + 'px',
     '--card-padding': card.padding + 'px',
@@ -88,4 +92,8 @@ export function profileVariables(
     '--footer-bg': card.color,
     '--footer-ink': accentInk(card.color),
   }
+}
+
+export function imageVariable(url: string) {
+  return 'url("' + url + '")'
 }

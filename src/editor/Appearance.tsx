@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import type { ComponentChildren } from 'preact'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import {
   avatarShapes,
   backgroundKinds,
@@ -15,7 +16,17 @@ import {
   type Appearance,
 } from '../profile/appearance'
 import { bytesOf } from '../profile/media'
+import {
+  clicks,
+  cursors,
+  namePresets,
+  overlays,
+  trails,
+  type ProfileEffects,
+} from '../profile/effects'
 import { contrastRatio } from '../profile/colors'
+import { themeVersion } from '../profile/document'
+import { AccessoryUpload } from './AccessoryUpload'
 import { loadBackground, loadVideoPoster } from './background-files'
 import { download, importTheme } from './files'
 import { Icon } from './Icon'
@@ -59,7 +70,31 @@ const optionLabels = {
   none: 'None',
   lift: 'Lift',
   slide: 'Slide',
+  default: 'Default cursor',
+  cell: 'Grid cursor',
+  crosshair: 'Crosshair',
+  custom: 'Custom image',
+  ghost: 'Ghost trail',
+  sparkles: 'Sparkles',
+  snow: 'Snow',
+  particles: 'Floating particles',
+  grain: 'Film grain',
+  ripple: 'Ripple',
+  burst: 'Particle burst',
+  glow: 'Glow',
+  gradient: 'Animated gradient',
 } as const satisfies Record<string, Message>
+
+const dialogs = {
+  background: 'Background',
+  overlay: 'Page overlay',
+  click: 'Click effects',
+  name: 'Display name effects',
+  cursor: 'Cursor and trail',
+  motion: 'Profile entrance',
+} as const
+
+type AppearanceDialog = keyof typeof dialogs
 
 function Reset({ name, onClick }: { name: string; onClick: () => void }) {
   const t = useCopy()
@@ -165,6 +200,7 @@ function Choice<
       <label>
         {label}
         <select
+          aria-label={label}
           value={value}
           onChange={(event) => {
             const next = values.find(
@@ -199,15 +235,24 @@ export function AppearanceEditor({
   replace,
   undo,
   canUndo,
+  renderPreview,
 }: {
   appearance: Appearance
   update: ChangeAppearance
   replace: ChangeAppearance
   undo: () => void
   canUndo: boolean
+  renderPreview: (key: number) => ComponentChildren
 }) {
   const t = useCopy()
-  const { preset, variant, background, typography, card, links } = appearance
+  const { preset, variant, background, typography, card, links, effects } =
+    appearance
+  const [activeDialog, setActiveDialog] = useState<AppearanceDialog | null>(
+    null,
+  )
+  const [previewKey, setPreviewKey] = useState(0)
+  const appearanceDialog = useRef<HTMLDialogElement>(null)
+  const opener = useRef<HTMLButtonElement>(null)
   const [status, setStatus] = useState<Message | ''>('')
   const [loading, setLoading] = useState(false)
   const [pendingVideo, setPendingVideo] = useState<string | null>(null)
@@ -218,6 +263,11 @@ export function AppearanceEditor({
   const resetDialog = useRef<HTMLDialogElement>(null)
   const operation = useRef(0)
   const defaults = presetAppearance(preset, variant)
+
+  useLayoutEffect(() => {
+    if (activeDialog && !appearanceDialog.current?.open)
+      appearanceDialog.current?.showModal()
+  }, [activeDialog])
 
   useEffect(
     () => () => {
@@ -251,6 +301,15 @@ export function AppearanceEditor({
   const setCard = setGroup('card')
   const setAvatar = setGroup('avatar')
   const setLinks = setGroup('links')
+  function setEffect<K extends keyof ProfileEffects>(
+    key: K,
+    edit: (current: ProfileEffects[K]) => ProfileEffects[K],
+  ) {
+    update((current) => ({
+      ...current,
+      effects: { ...current.effects, [key]: edit(current.effects[key]) },
+    }))
+  }
   const removeMedia = () => {
     clearOperation()
     update((current) => ({
@@ -358,7 +417,7 @@ export function AppearanceEditor({
     const blob = new Blob(
       [
         JSON.stringify(
-          { type: 'rvnce-theme', schemaVersion: 1, appearance },
+          { type: 'rvnce-theme', schemaVersion: themeVersion, appearance },
           null,
           2,
         ) + '\n',
@@ -406,6 +465,358 @@ export function AppearanceEditor({
     change: (value: string) => void,
     reset: () => void,
   ) => <Color label={label} value={value} change={change} reset={reset} />
+
+  const fileStatus = (
+    <>
+      {loading && <p role="status">{t('Reading file…')}</p>}
+      {status && <p role="status">{t(status)}</p>}
+      {error && (
+        <p class="field-error" role="alert">
+          {errorCopy(t, error.cause, 'The file could not be opened.')}
+        </p>
+      )}
+    </>
+  )
+  const backgroundControls = (
+    <div class="appearance-fields">
+      {fileStatus}
+      <Choice
+        label={t('Background type')}
+        value={background.kind}
+        values={media ? backgroundKinds : ['color', 'linear', 'radial']}
+        change={(kind) => {
+          if (kind !== 'media') clearOperation()
+          update((current) => ({
+            ...current,
+            background: {
+              ...current.background,
+              kind,
+              media: kind === 'media' ? current.background.media : null,
+            },
+          }))
+        }}
+        reset={() => resetGroup('background')}
+      />
+      {color(
+        t('Background color'),
+        background.color,
+        (value) => setBackground('color', value),
+        () => setBackground('color', defaults.background.color),
+      )}
+      {(background.kind === 'linear' || background.kind === 'radial') &&
+        color(
+          t('Gradient color'),
+          background.endColor,
+          (value) => setBackground('endColor', value),
+          () => setBackground('endColor', defaults.background.endColor),
+        )}
+      {background.kind === 'linear' &&
+        range(
+          t('Gradient angle'),
+          background.angle,
+          ranges.angle,
+          (value) => setBackground('angle', value),
+          () => setBackground('angle', defaults.background.angle),
+          '°',
+        )}
+      {(media || background.kind === 'radial') && (
+        <>
+          {range(
+            t('Horizontal position'),
+            background.x,
+            ranges.percent,
+            (value) => setBackground('x', value),
+            () => setBackground('x', defaults.background.x),
+            '%',
+          )}
+          {range(
+            t('Vertical position'),
+            background.y,
+            ranges.percent,
+            (value) => setBackground('y', value),
+            () => setBackground('y', defaults.background.y),
+            '%',
+          )}
+        </>
+      )}
+      {media && (
+        <>
+          <Choice
+            label={t('Image fit')}
+            value={background.fit}
+            values={fits}
+            change={(value) => setBackground('fit', value)}
+            reset={() => setBackground('fit', defaults.background.fit)}
+          />
+          {range(
+            t('Scale'),
+            background.scale,
+            ranges.scale,
+            (value) => setBackground('scale', value),
+            () => setBackground('scale', defaults.background.scale),
+            '%',
+          )}
+          {range(
+            t('Dimming'),
+            background.dim,
+            ranges.percent,
+            (value) => setBackground('dim', value),
+            () => setBackground('dim', defaults.background.dim),
+            '%',
+          )}
+          {range(
+            t('Background blur'),
+            background.blur,
+            ranges.blur,
+            (value) => setBackground('blur', value),
+            () => setBackground('blur', defaults.background.blur),
+            ' px',
+          )}
+        </>
+      )}
+      <div class="appearance-actions">
+        <button
+          type="button"
+          class="button button-outline"
+          onClick={() => fileInput.current?.click()}
+        >
+          {t(media ? 'Change background file' : 'Upload background')}
+        </button>
+        {media && (
+          <button
+            type="button"
+            class="button button-quiet"
+            onClick={removeMedia}
+          >
+            {t('Remove background file')}
+          </button>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,video/mp4"
+          aria-label={t('Background file')}
+          hidden
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            if (file) void selectFile(file, 'background')
+          }}
+        />
+      </div>
+      {pendingVideo && (
+        <div class="appearance-actions">
+          <button
+            type="button"
+            class="button button-outline"
+            onClick={() => posterInput.current?.click()}
+          >
+            {t('Upload video poster')}
+          </button>
+          <button
+            type="button"
+            class="button button-quiet"
+            onClick={clearOperation}
+          >
+            {t('Cancel video upload')}
+          </button>
+          <input
+            ref={posterInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            aria-label={t('Video poster file')}
+            hidden
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              if (file) void selectFile(file, 'poster')
+            }}
+          />
+        </div>
+      )}
+      {media ? (
+        <p class="hint">
+          {friendlySize(mediaSize)}
+          {'poster' in media &&
+            ' · ' +
+              t(
+                'Original motion files retain metadata. MP4 files may contain audio.',
+              )}
+        </p>
+      ) : (
+        <p class="hint">
+          {t(
+            'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB.',
+          )}
+        </p>
+      )}
+      <Reset
+        name={t('Background group')}
+        onClick={() => resetGroup('background')}
+      />
+    </div>
+  )
+
+  const controls = {
+    background: backgroundControls,
+    overlay: (
+      <div class="appearance-fields">
+        <Choice
+          label={t('Overlay preset')}
+          value={effects.overlay.preset}
+          values={overlays}
+          change={(preset) =>
+            setEffect('overlay', (current) => ({ ...current, preset }))
+          }
+          reset={() => setEffect('overlay', () => defaults.effects.overlay)}
+        />
+        {effects.overlay.preset !== 'none' && (
+          <>
+            {color(
+              t('Overlay color'),
+              effects.overlay.color,
+              (color) =>
+                setEffect('overlay', (current) => ({ ...current, color })),
+              () =>
+                setEffect('overlay', (current) => ({
+                  ...current,
+                  color: defaults.effects.overlay.color,
+                })),
+            )}
+            {range(
+              t('Overlay intensity'),
+              effects.overlay.intensity,
+              ranges.percent,
+              (intensity) =>
+                setEffect('overlay', (current) => ({ ...current, intensity })),
+              () =>
+                setEffect('overlay', (current) => ({
+                  ...current,
+                  intensity: defaults.effects.overlay.intensity,
+                })),
+              '%',
+            )}
+          </>
+        )}
+      </div>
+    ),
+    click: (
+      <div class="appearance-fields">
+        <Choice
+          label={t('Click effect preset')}
+          value={effects.click.preset}
+          values={clicks}
+          change={(preset) =>
+            setEffect('click', (current) => ({ ...current, preset }))
+          }
+          reset={() => setEffect('click', () => defaults.effects.click)}
+        />
+        {effects.click.preset !== 'none' &&
+          color(
+            t('Click effect color'),
+            effects.click.color,
+            (color) => setEffect('click', (current) => ({ ...current, color })),
+            () =>
+              setEffect('click', (current) => ({
+                ...current,
+                color: defaults.effects.click.color,
+              })),
+          )}
+      </div>
+    ),
+    name: (
+      <div class="appearance-fields">
+        <label class="appearance-check">
+          <input
+            type="checkbox"
+            checked={effects.sparkles.enabled}
+            onChange={(event) => {
+              const enabled = event.currentTarget.checked
+              setEffect('sparkles', (current) => ({ ...current, enabled }))
+            }}
+          />
+          {t('Sparkles around the name')}
+        </label>
+        {color(
+          t('Sparkle color'),
+          effects.sparkles.color,
+          (color) =>
+            setEffect('sparkles', (current) => ({ ...current, color })),
+          () =>
+            setEffect('sparkles', (current) => ({
+              ...current,
+              color: defaults.effects.sparkles.color,
+            })),
+        )}
+        <label class="appearance-check">
+          <input
+            type="checkbox"
+            checked={effects.name.enabled}
+            onChange={(event) => {
+              const enabled = event.currentTarget.checked
+              setEffect('name', (current) => ({ ...current, enabled }))
+            }}
+          />
+          {t('Style the name text')}
+        </label>
+        <Choice
+          label={t('Name effect preset')}
+          value={effects.name.preset}
+          values={namePresets}
+          change={(preset) =>
+            setEffect('name', (current) => ({ ...current, preset }))
+          }
+          reset={() =>
+            setEffect('name', (current) => ({
+              ...current,
+              preset: defaults.effects.name.preset,
+            }))
+          }
+        />
+      </div>
+    ),
+    cursor: (
+      <div class="appearance-fields">
+        <Choice
+          label={t('Cursor preset')}
+          value={effects.cursor.preset}
+          values={cursors.filter(
+            (preset) => preset !== 'custom' || effects.cursor.image,
+          )}
+          change={(preset) =>
+            setEffect('cursor', (current) => ({ ...current, preset }))
+          }
+          reset={() => setEffect('cursor', () => defaults.effects.cursor)}
+        />
+        <AccessoryUpload
+          kind="cursor"
+          change={(image) =>
+            setEffect('cursor', () => ({ preset: 'custom', image }))
+          }
+        />
+        <Choice
+          label={t('Cursor trail')}
+          value={effects.trail}
+          values={trails}
+          change={(trail) => setEffect('trail', () => trail)}
+          reset={() => setEffect('trail', () => defaults.effects.trail)}
+        />
+      </div>
+    ),
+    motion: (
+      <label class="appearance-check">
+        <input
+          type="checkbox"
+          checked={appearance.entrance}
+          onChange={(event) => {
+            const entrance = event.currentTarget.checked
+            update((current) => ({ ...current, entrance }))
+          }}
+        />
+        {t('Animate profile entrance')}
+      </label>
+    ),
+  }
 
   return (
     <div class="appearance-editor">
@@ -477,13 +888,7 @@ export function AppearanceEditor({
           }}
         />
       </div>
-      {loading && <p role="status">{t('Reading file…')}</p>}
-      {status && <p role="status">{t(status)}</p>}
-      {error && (
-        <p class="field-error" role="alert">
-          {errorCopy(t, error.cause, 'The file could not be opened.')}
-        </p>
-      )}
+      {activeDialog !== 'background' && fileStatus}
       {lowContrast && (
         <p class="field-error">
           {t(
@@ -491,188 +896,23 @@ export function AppearanceEditor({
           )}
         </p>
       )}
-      <details class="appearance-group" open>
-        <summary>
-          {t('Background')}
-          <Icon name="down" />
-        </summary>
-        <div class="appearance-fields">
-          <Choice
-            label={t('Background type')}
-            value={background.kind}
-            values={media ? backgroundKinds : ['color', 'linear', 'radial']}
-            change={(kind) => {
-              if (kind !== 'media') clearOperation()
-              update((current) => ({
-                ...current,
-                background: {
-                  ...current.background,
-                  kind,
-                  media: kind === 'media' ? current.background.media : null,
-                },
-              }))
+      <div class="appearance-dialog-openers">
+        {(Object.keys(dialogs) as AppearanceDialog[]).map((key) => (
+          <button
+            type="button"
+            class="appearance-dialog-opener"
+            key={key}
+            aria-haspopup="dialog"
+            onClick={(event) => {
+              opener.current = event.currentTarget
+              setActiveDialog(key)
             }}
-            reset={() => resetGroup('background')}
-          />
-          {color(
-            t('Background color'),
-            background.color,
-            (value) => setBackground('color', value),
-            () => setBackground('color', defaults.background.color),
-          )}
-          {(background.kind === 'linear' || background.kind === 'radial') &&
-            color(
-              t('Gradient color'),
-              background.endColor,
-              (value) => setBackground('endColor', value),
-              () => setBackground('endColor', defaults.background.endColor),
-            )}
-          {background.kind === 'linear' &&
-            range(
-              t('Gradient angle'),
-              background.angle,
-              ranges.angle,
-              (value) => setBackground('angle', value),
-              () => setBackground('angle', defaults.background.angle),
-              '°',
-            )}
-          {(media || background.kind === 'radial') && (
-            <>
-              {range(
-                t('Horizontal position'),
-                background.x,
-                ranges.percent,
-                (value) => setBackground('x', value),
-                () => setBackground('x', defaults.background.x),
-                '%',
-              )}
-              {range(
-                t('Vertical position'),
-                background.y,
-                ranges.percent,
-                (value) => setBackground('y', value),
-                () => setBackground('y', defaults.background.y),
-                '%',
-              )}
-            </>
-          )}
-          {media && (
-            <>
-              <Choice
-                label={t('Image fit')}
-                value={background.fit}
-                values={fits}
-                change={(value) => setBackground('fit', value)}
-                reset={() => setBackground('fit', defaults.background.fit)}
-              />
-              {range(
-                t('Scale'),
-                background.scale,
-                ranges.scale,
-                (value) => setBackground('scale', value),
-                () => setBackground('scale', defaults.background.scale),
-                '%',
-              )}
-              {range(
-                t('Dimming'),
-                background.dim,
-                ranges.percent,
-                (value) => setBackground('dim', value),
-                () => setBackground('dim', defaults.background.dim),
-                '%',
-              )}
-              {range(
-                t('Background blur'),
-                background.blur,
-                ranges.blur,
-                (value) => setBackground('blur', value),
-                () => setBackground('blur', defaults.background.blur),
-                ' px',
-              )}
-            </>
-          )}
-          <div class="appearance-actions">
-            <button
-              type="button"
-              class="button button-outline"
-              onClick={() => fileInput.current?.click()}
-            >
-              {t(media ? 'Change background file' : 'Upload background')}
-            </button>
-            {media && (
-              <button
-                type="button"
-                class="button button-quiet"
-                onClick={removeMedia}
-              >
-                {t('Remove background file')}
-              </button>
-            )}
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4"
-              aria-label={t('Background file')}
-              hidden
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0]
-                event.currentTarget.value = ''
-                if (file) void selectFile(file, 'background')
-              }}
-            />
-          </div>
-          {pendingVideo && (
-            <div class="appearance-actions">
-              <button
-                type="button"
-                class="button button-outline"
-                onClick={() => posterInput.current?.click()}
-              >
-                {t('Upload video poster')}
-              </button>
-              <button
-                type="button"
-                class="button button-quiet"
-                onClick={clearOperation}
-              >
-                {t('Cancel video upload')}
-              </button>
-              <input
-                ref={posterInput}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                aria-label={t('Video poster file')}
-                hidden
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0]
-                  event.currentTarget.value = ''
-                  if (file) void selectFile(file, 'poster')
-                }}
-              />
-            </div>
-          )}
-          {media ? (
-            <p class="hint">
-              {friendlySize(mediaSize)}
-              {'poster' in media &&
-                ' · ' +
-                  t(
-                    'Original motion files retain metadata. MP4 files may contain audio.',
-                  )}
-            </p>
-          ) : (
-            <p class="hint">
-              {t(
-                'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB.',
-              )}
-            </p>
-          )}
-          <Reset
-            name={t('Background group')}
-            onClick={() => resetGroup('background')}
-          />
-        </div>
-      </details>
+          >
+            {t(dialogs[key])}
+            <Icon name="right" />
+          </button>
+        ))}
+      </div>
       <details class="appearance-group">
         <summary>
           {t('Typography')}
@@ -933,17 +1173,6 @@ export function AppearanceEditor({
           <Reset name={t('Link group')} onClick={() => resetGroup('links')} />
         </div>
       </details>
-      <label class="appearance-check">
-        <input
-          type="checkbox"
-          checked={appearance.entrance}
-          onChange={(event) => {
-            const entrance = event.currentTarget.checked
-            update((current) => ({ ...current, entrance }))
-          }}
-        />
-        {t('Animate profile entrance')}
-      </label>
       <div class="appearance-actions">
         {canUndo && (
           <button
@@ -965,6 +1194,71 @@ export function AppearanceEditor({
           {t('Reset appearance')}
         </button>
       </div>
+      <dialog
+        ref={appearanceDialog}
+        class="settings-dialog"
+        aria-labelledby="appearance-dialog-title"
+        onClose={() => {
+          setActiveDialog(null)
+          opener.current?.focus()
+        }}
+      >
+        {activeDialog && (
+          <>
+            <header class="settings-dialog-header">
+              <h2 id="appearance-dialog-title">{t(dialogs[activeDialog])}</h2>
+              <button
+                type="button"
+                class="button button-quiet"
+                autoFocus
+                onClick={() => appearanceDialog.current?.close()}
+              >
+                {t('Done')}
+              </button>
+            </header>
+            <div class="settings-dialog-body">
+              <div class="settings-dialog-controls">
+                {controls[activeDialog]}
+              </div>
+              <div class="settings-dialog-preview">
+                <div class="settings-preview-bar">
+                  <span id="appearance-preview-title">
+                    {t('Settings preview')}
+                  </span>
+                  {(activeDialog === 'overlay' ||
+                    activeDialog === 'name' ||
+                    activeDialog === 'motion') && (
+                    <button
+                      type="button"
+                      class="appearance-reset"
+                      onClick={() => setPreviewKey((key) => key + 1)}
+                    >
+                      {t('Replay preview')}
+                    </button>
+                  )}
+                </div>
+                {(activeDialog === 'click' || activeDialog === 'cursor') && (
+                  <p class="hint">
+                    {t(
+                      activeDialog === 'click'
+                        ? 'Click inside the preview to test the effect.'
+                        : 'Move your pointer inside the preview to try the cursor and trail.',
+                    )}
+                  </p>
+                )}
+                <div
+                  class="settings-profile-scroll profile-viewport"
+                  role="region"
+                  aria-labelledby="appearance-preview-title"
+                  tabIndex={0}
+                >
+                  {renderPreview(previewKey)}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </dialog>
       <dialog
         ref={resetDialog}
         class="import-dialog"

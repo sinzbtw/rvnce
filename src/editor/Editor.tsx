@@ -12,8 +12,8 @@ import {
 } from '../profile/document'
 import { examples } from '../profile/demo'
 import { bytesOf } from '../profile/media'
-import { PublicProfile } from '../public/PublicProfile'
 import { AppearanceEditor } from './Appearance'
+import { ProfilePreview } from './ProfilePreview'
 import { useFloatingPreview } from './floating-preview'
 import { Icon } from './Icon'
 import {
@@ -38,7 +38,6 @@ import {
 } from './preferences'
 import type { StoredDraft } from './storage'
 import { useDraft } from './useDraft'
-import { usePreviewMedia } from './usePreviewMedia'
 
 const sections = ['Profile', 'Links', 'Appearance'] as const
 type Section = (typeof sections)[number]
@@ -203,7 +202,6 @@ export function Editor({
   const avatar = doc.profile.avatar ? pngDataUrl(doc.profile.avatar) : null
   const favicon = doc.branding.favicon ? pngDataUrl(doc.branding.favicon) : null
   const media = doc.appearance.background.media
-  const previewMedia = usePreviewMedia(previewShown ? media : null)
   const exportBytes = media
     ? bytesOf(media.data) + ('poster' in media ? bytesOf(media.poster) : 0)
     : 0
@@ -1061,6 +1059,9 @@ export function Editor({
                 replace={(edit) => updateAppearance(edit, true)}
                 undo={undoAppearance}
                 canUndo={priorAppearance !== null}
+                renderPreview={(key) => (
+                  <ProfilePreview key={key} doc={previewDoc} locale={locale} />
+                )}
               />
             )}
           </div>
@@ -1188,18 +1189,10 @@ export function Editor({
                 aria-label={t('Live preview')}
                 tabIndex={0}
               >
-                <PublicProfile
+                <ProfilePreview
                   doc={previewDoc}
-                  assets={{ avatarUrl: avatar, ...previewMedia }}
-                  preview
-                  previewLabels={{
-                    locale,
-                    name: t('Your name'),
-                    links: t('Profile links'),
-                    credit: t('Made with Rvnce'),
-                    playBackground: t('Play background'),
-                    stopBackground: t('Stop background'),
-                  }}
+                  locale={locale}
+                  shown={previewShown}
                 />
               </div>
             </div>

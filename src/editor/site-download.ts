@@ -7,6 +7,7 @@ import serifCss from '@fontsource-variable/source-serif-4/index.css?raw'
 import serifLicense from '@fontsource-variable/source-serif-4/LICENSE?raw'
 import css from '../public/profile.css?raw'
 import motionScript from '../public/background-motion.js?raw'
+import pointerScript from '../public/pointer-effects.js?raw'
 import { fontFiles, siteFiles } from '../export/site'
 import type { ProfileDocument } from '../profile/document'
 import { publishedAvatar, publishedFavicon } from './files'
@@ -61,6 +62,7 @@ export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
   const files = siteFiles(doc, {
     css,
     motionScript,
+    pointerScript,
     fontCss,
     fonts: Object.fromEntries(fonts),
     fontLicense: strToU8(fontLicense),

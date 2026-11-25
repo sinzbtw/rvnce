@@ -1,9 +1,13 @@
 import { presetAppearance, type PresetName } from './appearance'
-import type { LinkBlock, ProfileDocument } from './document'
+import {
+  profileVersion,
+  type LinkBlock,
+  type ProfileDocument,
+} from './document'
 
 export function newProfile(): ProfileDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: profileVersion,
     profile: { name: '', bio: '', avatar: null, language: 'en' },
     appearance: presetAppearance('minimal'),
     branding: { showMadeWithRvnce: true, favicon: null },

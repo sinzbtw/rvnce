@@ -22,6 +22,7 @@ async function serveArchive(archive: ReturnType<typeof unzipSync>) {
     js: 'text/javascript',
     css: 'text/css',
     woff2: 'font/woff2',
+    png: 'image/png',
     gif: 'image/gif',
     jpg: 'image/jpeg',
     mp4: 'video/mp4',
@@ -71,12 +72,156 @@ async function serveArchive(archive: ReturnType<typeof unzipSync>) {
   }
 }
 
+test('effect dialogs preview immediately, restore focus, and match the static export', async ({
+  page,
+  browser,
+}) => {
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Mira Park')
+  await page.getByRole('button', { name: 'Appearance' }).click()
+
+  const overlayButton = page.getByRole('button', { name: 'Page overlay' })
+  await overlayButton.focus()
+  await page.keyboard.press('Enter')
+  const overlay = page.getByRole('dialog', { name: 'Page overlay' })
+  await expect(overlay.getByRole('button', { name: 'Done' })).toBeFocused()
+  await overlay
+    .getByLabel('Overlay preset', { exact: true })
+    .selectOption('snow')
+  await overlay.getByLabel('Overlay color', { exact: true }).fill('#55ccaa')
+  await overlay.getByLabel('Overlay intensity', { exact: true }).fill('80')
+  await expect(overlay.locator('.profile-overlay')).toHaveAttribute(
+    'data-overlay',
+    'snow',
+  )
+  await expect(overlay.locator('.profile-overlay')).toHaveCSS('opacity', '0.2')
+  await page.keyboard.press('Escape')
+  await expect(overlayButton).toBeFocused()
+
+  await page.getByRole('button', { name: 'Display name effects' }).click()
+  const name = page.getByRole('dialog', { name: 'Display name effects' })
+  await name.getByLabel('Sparkles around the name').check()
+  await name.getByLabel('Sparkle color', { exact: true }).fill('#8844aa')
+  await name.getByLabel('Style the name text').check()
+  await name
+    .getByLabel('Name effect preset', { exact: true })
+    .selectOption('gradient')
+  await expect(name.locator('.profile-name-text')).toHaveAttribute(
+    'data-name-effect',
+    'gradient',
+  )
+  await expect(name.locator('.profile-name-sparkles')).toHaveCSS(
+    'color',
+    'rgb(136, 68, 170)',
+  )
+  await name.getByLabel('Sparkles around the name').uncheck()
+  await expect(name.locator('.profile-name-sparkles')).toHaveCount(0)
+  await expect(name.locator('.profile-name-text')).toHaveAttribute(
+    'data-name-effect',
+    'gradient',
+  )
+  await name.getByLabel('Sparkles around the name').check()
+  await expect(name.getByLabel('Sparkle color', { exact: true })).toHaveValue(
+    '#8844aa',
+  )
+  await name.getByRole('button', { name: 'Done' }).click()
+
+  await page.getByRole('button', { name: 'Click effects' }).click()
+  const click = page.getByRole('dialog', { name: 'Click effects' })
+  await click
+    .getByLabel('Click effect preset', { exact: true })
+    .selectOption('ripple')
+  const clickPreview = click.locator('.public-profile')
+  await clickPreview.click({ position: { x: 70, y: 75 } })
+  await expect(click.locator('[data-effect="ripple"]')).toHaveCSS(
+    'left',
+    /^(?:69|70)(?:\.\d+)?px$/,
+  )
+  await expect(click.locator('[data-effect="ripple"]')).toHaveCount(0)
+  await click.getByRole('button', { name: 'Done' }).click()
+
+  await page.getByRole('button', { name: 'Cursor and trail' }).click()
+  const cursor = page.getByRole('dialog', { name: 'Cursor and trail' })
+  const cursorPreview = cursor.locator('.public-profile')
+  await cursor
+    .getByLabel('Cursor preset', { exact: true })
+    .selectOption('crosshair')
+  await expect(cursorPreview).toHaveCSS('cursor', 'crosshair')
+  await cursor.locator('input[type=file]').setInputFiles({
+    name: 'cursor.png',
+    mimeType: 'image/png',
+    buffer: await readFile(photo),
+  })
+  await expect(cursorPreview).toHaveAttribute('data-cursor', 'custom')
+  await cursor.getByLabel('Cursor trail', { exact: true }).selectOption('ghost')
+  await cursorPreview.hover({ position: { x: 55, y: 60 } })
+  await expect(cursor.locator('[data-effect="ghost"]').first()).toBeVisible()
+  await cursor.getByRole('button', { name: 'Done' }).click()
+
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(archive['cursor.png']).toBeDefined()
+  expect(strFromU8(archive['profile.css']!)).toContain('url("./cursor.png")')
+  const host = await serveArchive(archive)
+  const context = await browser.newContext()
+  try {
+    const published = await context.newPage()
+    await published.goto(host.url)
+    await expect(published.locator('.profile-overlay')).toHaveAttribute(
+      'data-overlay',
+      'snow',
+    )
+    await expect(published.locator('.profile-name-sparkles')).toHaveCSS(
+      'color',
+      'rgb(136, 68, 170)',
+    )
+    await expect(published.locator('.public-profile')).toHaveCSS(
+      'cursor',
+      /cursor\.png/,
+    )
+    await published
+      .locator('.public-profile')
+      .click({ position: { x: 54, y: 65 } })
+    await expect(published.locator('[data-effect="ripple"]')).toHaveCSS(
+      'top',
+      /^(?:64|65)(?:\.\d+)?px$/,
+    )
+    await published.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(published.locator('.profile-name-text')).not.toHaveCSS(
+      'color',
+      'rgba(0, 0, 0, 0)',
+    )
+    await expect(published.locator('.profile-overlay i').first()).toHaveCSS(
+      'animation-name',
+      'none',
+    )
+    await published
+      .locator('.public-profile')
+      .click({ position: { x: 55, y: 65 } })
+    await expect(published.locator('.profile-pointer-mark')).toHaveCount(0)
+  } finally {
+    await context.close()
+    await host.close()
+  }
+
+  await page.setViewportSize({ width: 390, height: 700 })
+  await page.getByRole('button', { name: 'Page overlay' }).click()
+  await expect(
+    overlay.getByRole('region', { name: 'Settings preview' }),
+  ).toBeVisible()
+  await expect(
+    overlay.getByLabel('Overlay preset', { exact: true }),
+  ).toBeVisible()
+  expect(
+    await overlay.evaluate((dialog) => dialog.scrollWidth),
+  ).toBeLessThanOrEqual(390)
+})
+
 test('keeps branding independent of portable themes and restores the full draft', async ({
   page,
 }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Show preview' }).click()
-  const preview = page.locator('.public-profile')
+  const preview = page.locator('.preview-pane .public-profile')
   const credit = preview.getByText('Made with Rvnce', { exact: true })
   await expect(preview).toHaveAttribute('data-preset', 'minimal')
   await expect(credit).toBeVisible()
@@ -87,12 +232,18 @@ test('keeps branding independent of portable themes and restores the full draft'
   await page.getByRole('button', { name: 'Glass', exact: true }).click()
   await expect(preview).toHaveAttribute('data-preset', 'glass')
   await expect(credit).toHaveCount(0)
-  const upload = page.locator('input[aria-label="Background file"]')
+  const background = page.getByRole('dialog', { name: 'Background' })
+  const openBackground = () =>
+    page.getByRole('button', { name: 'Background', exact: true }).click()
+  const upload = background.locator('input[aria-label="Background file"]')
+  await openBackground()
   await upload.setInputFiles({
     name: 'background.png',
     mimeType: 'image/png',
     buffer: await readFile(photo),
   })
+  await expect(background.locator('.profile-backdrop img')).toBeVisible()
+  await background.getByRole('button', { name: 'Done' }).click()
   await expect(preview.locator('.profile-backdrop img')).toBeVisible()
   await expect(page.getByText('Saved locally')).toBeVisible()
   await page.reload()
@@ -106,14 +257,18 @@ test('keeps branding independent of portable themes and restores the full draft'
   expect(parsedTheme.appearance.background.media?.type).toBe('image/png')
   expect(parsedTheme).not.toHaveProperty('branding')
 
+  await openBackground()
   await upload.setInputFiles({
     name: 'broken.png',
     mimeType: 'image/png',
     buffer: Buffer.from('broken'),
   })
-  await expect(page.getByRole('alert')).toContainText('Choose a readable')
-  await expect(preview.locator('.profile-backdrop img')).toBeVisible()
-  await page.getByRole('button', { name: 'Remove background file' }).click()
+  await expect(background.getByRole('alert')).toContainText('Choose a readable')
+  await expect(background.locator('.profile-backdrop img')).toBeVisible()
+  await background
+    .getByRole('button', { name: 'Remove background file' })
+    .click()
+  await background.getByRole('button', { name: 'Done' }).click()
   await expect(preview.locator('.profile-backdrop img')).toHaveCount(0)
   await page.locator('input[aria-label="Theme file"]').setInputFiles({
     name: 'theme.json',
@@ -172,21 +327,25 @@ for (const extension of ['gif', 'mp4'] as const) {
           .createElement('video')
           .canPlayType('video/mp4; codecs="avc1.42E01E"'),
       )
-      const input = page.locator('input[aria-label="Background file"]')
+      await page
+        .getByRole('button', { name: 'Background', exact: true })
+        .click()
+      const settings = page.getByRole('dialog', { name: 'Background' })
+      const input = settings.locator('input[aria-label="Background file"]')
       await input.setInputFiles({
         name: 'background.' + extension,
         mimeType,
         buffer: original,
       })
-      const poster = page.locator('.background-poster')
-      const manualPoster = page.getByRole('button', {
+      const settingsPoster = settings.locator('.background-poster')
+      const manualPoster = settings.getByRole('button', {
         name: 'Upload video poster',
       })
-      await expect(poster.or(manualPoster)).toBeVisible()
+      await expect(settingsPoster.or(manualPoster)).toBeVisible()
       const posterOnlyPreview = await manualPoster.isVisible()
       if (posterOnlyPreview) {
         expect(extension).toBe('mp4')
-        await page
+        await settings
           .locator('input[aria-label="Video poster file"]')
           .setInputFiles({
             name: 'poster.png',
@@ -194,8 +353,12 @@ for (const extension of ['gif', 'mp4'] as const) {
             buffer: await readFile(photo),
           })
       }
+      await expect(settingsPoster).toBeVisible()
+      await settings.getByRole('button', { name: 'Done' }).click()
+      const preview = page.locator('.preview-pane')
+      const poster = preview.locator('.background-poster')
       await expect(poster).toBeVisible()
-      const motion = page.locator('.background-moving')
+      const motion = preview.locator('.background-moving')
       if (extension === 'gif') {
         await expect(motion).toHaveAttribute(
           'src',
@@ -205,15 +368,15 @@ for (const extension of ['gif', 'mp4'] as const) {
         await expect(motion).not.toHaveAttribute('src', /.+/u)
       }
       if (!posterOnlyPreview) {
-        await page.getByRole('button', { name: 'Play background' }).click()
-        await expect(page.locator('rvnce-motion')).toHaveAttribute(
+        await preview.getByRole('button', { name: 'Play background' }).click()
+        await expect(preview.locator('rvnce-motion')).toHaveAttribute(
           'data-playing',
           '',
         )
         if (extension === 'mp4')
           await expect(motion).toHaveJSProperty('duration', 20)
-        await page.getByRole('button', { name: 'Stop background' }).click()
-        await expect(page.locator('rvnce-motion')).not.toHaveAttribute(
+        await preview.getByRole('button', { name: 'Stop background' }).click()
+        await expect(preview.locator('rvnce-motion')).not.toHaveAttribute(
           'data-playing',
           '',
         )

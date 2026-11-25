@@ -4,6 +4,7 @@ import {
   type Appearance,
 } from './appearance'
 import { accentInk } from './colors'
+import { defaultEffects } from './effects'
 import { hasKeys, isHex, record } from './shape'
 
 export const officialEditor = 'https://sinzbtw.github.io/rvnce/'
@@ -32,8 +33,11 @@ export interface LinkBlock {
   url: string
 }
 
+export const profileVersion = 5
+export const themeVersion = 2
+
 export interface ProfileDocument {
-  schemaVersion: 4
+  schemaVersion: typeof profileVersion
   profile: {
     name: string
     bio: string
@@ -47,7 +51,7 @@ export interface ProfileDocument {
 
 export interface ThemeDocument {
   type: 'rvnce-theme'
-  schemaVersion: 1
+  schemaVersion: typeof themeVersion
   appearance: Appearance
 }
 
@@ -181,14 +185,14 @@ export function parseTheme(raw: string): ThemeDocument {
   if (
     !hasKeys(value, ['type', 'schemaVersion', 'appearance']) ||
     value.type !== 'rvnce-theme' ||
-    value.schemaVersion !== 1
+    (value.schemaVersion !== 1 && value.schemaVersion !== themeVersion)
   ) {
     throw new Error('Choose a supported Rvnce theme JSON.')
   }
   return {
     type: 'rvnce-theme',
-    schemaVersion: 1,
-    appearance: parseAppearance(value.appearance),
+    schemaVersion: themeVersion,
+    appearance: parseAppearance(value.appearance, value.schemaVersion === 1),
   }
 }
 
@@ -208,7 +212,8 @@ export function validateProfile(
     (value.schemaVersion !== 1 &&
       value.schemaVersion !== 2 &&
       value.schemaVersion !== 3 &&
-      value.schemaVersion !== 4)
+      value.schemaVersion !== 4 &&
+      value.schemaVersion !== profileVersion)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
   }
@@ -245,9 +250,9 @@ export function validateProfile(
   let showMadeWithRvnce = false
   let favicon: string | null = null
   if (version >= 3) {
-    parsedAppearance = parseAppearance(appearance)
+    parsedAppearance = parseAppearance(appearance, version < profileVersion)
     const brandingKeys =
-      version === 4 ? ['showMadeWithRvnce', 'favicon'] : ['showMadeWithRvnce']
+      version >= 4 ? ['showMadeWithRvnce', 'favicon'] : ['showMadeWithRvnce']
     if (
       !hasKeys(value.branding, brandingKeys) ||
       typeof value.branding.showMadeWithRvnce !== 'boolean'
@@ -255,7 +260,7 @@ export function validateProfile(
       throw new Error('The profile branding is invalid.')
     }
     showMadeWithRvnce = value.branding.showMadeWithRvnce
-    if (version === 4 && value.branding.favicon !== null) {
+    if (version >= 4 && value.branding.favicon !== null) {
       if (typeof value.branding.favicon !== 'string') {
         throw new Error('The profile branding is invalid.')
       }
@@ -274,6 +279,7 @@ export function validateProfile(
     parsedAppearance = {
       ...presetAppearance('graphic', appearance.variant),
       accent: appearance.accent,
+      effects: defaultEffects(appearance.accent),
     }
     parsedAppearance.links.color = appearance.accent
     parsedAppearance.links.text = accentInk(appearance.accent)
@@ -303,7 +309,7 @@ export function validateProfile(
     return { id: block.id, type: 'link', label, url }
   })
   const doc: ProfileDocument = {
-    schemaVersion: 4,
+    schemaVersion: profileVersion,
     profile: { name, bio, avatar: profile.avatar, language },
     appearance: parsedAppearance,
     branding: { showMadeWithRvnce, favicon },

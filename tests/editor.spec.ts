@@ -77,7 +77,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
     await readFile(jsonPath!, 'utf8'),
   ) as ProfileDocument
   expect(profile.profile.avatar).toBeTruthy()
-  expect(profile.schemaVersion).toBe(4)
+  expect(profile.schemaVersion).toBe(5)
   expect(profile.branding.favicon).toBeTruthy()
   expect(profile.appearance.accent).toBe('#176451')
 
