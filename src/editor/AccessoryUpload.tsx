@@ -36,7 +36,9 @@ export function AccessoryUpload({
     }
   }
 
-  const label = t('Upload cursor image')
+  const label = t(
+    kind === 'cursor' ? 'Upload cursor image' : 'Upload link icon',
+  )
   return (
     <div class="accessory-upload">
       <button

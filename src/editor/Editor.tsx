@@ -13,6 +13,7 @@ import {
 import { examples } from '../profile/demo'
 import { bytesOf } from '../profile/media'
 import { AppearanceEditor } from './Appearance'
+import { IconLinkFields } from './IconLinkFields'
 import { ProfilePreview } from './ProfilePreview'
 import { useFloatingPreview } from './floating-preview'
 import { Icon } from './Icon'
@@ -329,41 +330,52 @@ export function Editor({
     }))
   }
 
-  function addLink() {
+  function addLink(type: LinkBlock['type']) {
     if (latest.current.blocks.length >= limits.blocks) return
     captureLinks()
     const id = Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) =>
       byte.toString(16).padStart(2, '0'),
     ).join('')
     addFocus.current = 'label-' + id
+    const fields = { id, label: '', url: '' }
+    const link: LinkBlock =
+      type === 'icon'
+        ? { ...fields, type, icon: 'auto', image: null, tint: false }
+        : { ...fields, type }
     update((current) => ({
       ...current,
-      blocks: [...current.blocks, { id, type: 'link', label: '', url: '' }],
+      blocks: [...current.blocks, link],
     }))
   }
 
-  function editLink(id: string, field: 'label' | 'url', value: string) {
+  function editLink(id: string, edit: (link: LinkBlock) => LinkBlock) {
     update((current) => ({
       ...current,
       blocks: current.blocks.map((block) =>
-        block.id === id ? { ...block, [field]: value } : block,
+        block.id === id ? edit(block) : block,
       ),
     }))
   }
 
   function moveLink(id: string, offset: number) {
     update((current) => {
-      const index = current.blocks.findIndex((block) => block.id === id)
-      const target = index + offset
       const blocks = [...current.blocks]
+      const index = blocks.findIndex((block) => block.id === id)
       const from = blocks[index]
+      if (!from) return current
+      const peers = blocks.flatMap((block, position) =>
+        block.type === from.type ? [position] : [],
+      )
+      const destination = peers.indexOf(index) + offset
+      const target = peers[destination]
+      if (target === undefined) return current
       const to = blocks[target]
-      if (!from || !to) return current
+      if (!to) return current
       captureLinks()
       blocks[index] = to
       blocks[target] = from
       const direction =
-        target + offset < 0 || target + offset >= blocks.length
+        destination + offset < 0 || destination + offset >= peers.length
           ? -offset
           : offset
       const focusId = (direction < 0 ? 'move-up-' : 'move-down-') + id
@@ -373,12 +385,20 @@ export function Editor({
   }
 
   function removeLink(id: string) {
-    const index = latest.current.blocks.findIndex((block) => block.id === id)
+    const block = latest.current.blocks.find((item) => item.id === id)
+    if (!block) return
+    const peers = latest.current.blocks.filter(
+      (item) => item.type === block.type,
+    )
+    const index = peers.indexOf(block)
     if (index < 0) return
     captureLinks(id)
-    const next =
-      latest.current.blocks[index + 1] ?? latest.current.blocks[index - 1]
-    addFocus.current = next ? 'label-' + next.id : 'add-link'
+    const next = peers[index + 1] ?? peers[index - 1]
+    addFocus.current = next
+      ? 'label-' + next.id
+      : block.type === 'icon'
+        ? 'add-icon-link'
+        : 'add-link'
     update((current) => ({
       ...current,
       blocks: current.blocks.filter((block) => block.id !== id),
@@ -939,110 +959,157 @@ export function Editor({
                     {t('Add a link to a site you want visitors to find.')}
                   </p>
                 )}
-                {doc.blocks.map((block, index) => {
-                  const issue = issues.blocks[index]
-                  const label = linkLabel(block, index)
+                {(['link', 'icon'] as const).map((type) => {
+                  const rows = doc.blocks.flatMap((block, index) =>
+                    block.type === type
+                      ? [{ block, issue: issues.blocks[index] }]
+                      : [],
+                  )
                   return (
-                    <fieldset
-                      class="link-fieldset"
-                      key={block.id}
-                      data-link-row={block.id}
+                    <section
+                      class="link-editor-group"
+                      aria-labelledby={'link-group-' + type}
+                      key={type}
                     >
-                      <legend>{t('Link {value}', { value: index + 1 })}</legend>
-                      <div class="link-tools">
-                        <button
-                          class="icon-button"
-                          id={'move-up-' + block.id}
-                          disabled={index === 0}
-                          aria-label={t('Move {value} up', { value: label })}
-                          onClick={() => moveLink(block.id, -1)}
-                        >
-                          <Icon name="up" />
-                        </button>
-                        <button
-                          class="icon-button"
-                          id={'move-down-' + block.id}
-                          disabled={index === doc.blocks.length - 1}
-                          aria-label={t('Move {value} down', { value: label })}
-                          onClick={() => moveLink(block.id, 1)}
-                        >
-                          <Icon name="down" />
-                        </button>
-                        <button
-                          class="icon-button"
-                          aria-label={t('Remove {value}', { value: label })}
-                          onClick={() => removeLink(block.id)}
-                        >
-                          <Icon name="remove" />
-                        </button>
-                      </div>
-                      <label class="field">
-                        <span class="field-label">{t('Label')}</span>
-                        <input
-                          id={'label-' + block.id}
-                          value={block.label}
-                          maxLength={limits.label}
-                          aria-invalid={Boolean(issue?.label)}
-                          aria-describedby={
-                            issue?.label ? 'label-error-' + block.id : undefined
-                          }
-                          onInput={(event) =>
-                            editLink(
-                              block.id,
-                              'label',
-                              fieldValue(event.currentTarget),
-                            )
-                          }
-                        />
-                        {issue?.label && (
-                          <span
-                            class="field-error"
-                            id={'label-error-' + block.id}
+                      <h3 id={'link-group-' + type}>
+                        {t(type === 'icon' ? 'Icon links' : 'Button links')}
+                      </h3>
+                      {rows.map(({ block, issue }, index) => {
+                        const label = linkLabel(block, index)
+                        return (
+                          <fieldset
+                            class="link-fieldset"
+                            key={block.id}
+                            data-link-row={block.id}
                           >
-                            {t(issue.label)}
-                          </span>
-                        )}
-                      </label>
-                      <label class="field">
-                        <span class="field-label">URL</span>
-                        <input
-                          id={'url-' + block.id}
-                          type="url"
-                          value={block.url}
-                          maxLength={limits.url}
-                          placeholder="https://example.com"
-                          aria-invalid={Boolean(issue?.url)}
-                          aria-describedby={
-                            issue?.url ? 'url-error-' + block.id : undefined
-                          }
-                          onInput={(event) =>
-                            editLink(
-                              block.id,
-                              'url',
-                              fieldValue(event.currentTarget),
-                            )
-                          }
-                        />
-                        {issue?.url && (
-                          <span
-                            class="field-error"
-                            id={'url-error-' + block.id}
-                          >
-                            {t(issue.url)}
-                          </span>
-                        )}
-                      </label>
-                    </fieldset>
+                            <legend>
+                              {t(
+                                type === 'icon'
+                                  ? 'Icon link {value}'
+                                  : 'Link {value}',
+                                { value: index + 1 },
+                              )}
+                            </legend>
+                            <div class="link-tools">
+                              <button
+                                class="icon-button"
+                                id={'move-up-' + block.id}
+                                disabled={index === 0}
+                                aria-label={t('Move {value} up', {
+                                  value: label,
+                                })}
+                                onClick={() => moveLink(block.id, -1)}
+                              >
+                                <Icon name="up" />
+                              </button>
+                              <button
+                                class="icon-button"
+                                id={'move-down-' + block.id}
+                                disabled={index === rows.length - 1}
+                                aria-label={t('Move {value} down', {
+                                  value: label,
+                                })}
+                                onClick={() => moveLink(block.id, 1)}
+                              >
+                                <Icon name="down" />
+                              </button>
+                              <button
+                                class="icon-button"
+                                aria-label={t('Remove {value}', {
+                                  value: label,
+                                })}
+                                onClick={() => removeLink(block.id)}
+                              >
+                                <Icon name="remove" />
+                              </button>
+                            </div>
+                            <label class="field">
+                              <span class="field-label">{t('Label')}</span>
+                              <input
+                                id={'label-' + block.id}
+                                value={block.label}
+                                maxLength={limits.label}
+                                aria-invalid={Boolean(issue?.label)}
+                                aria-describedby={
+                                  issue?.label
+                                    ? 'label-error-' + block.id
+                                    : undefined
+                                }
+                                onInput={(event) => {
+                                  const label = fieldValue(event.currentTarget)
+                                  editLink(block.id, (current) => ({
+                                    ...current,
+                                    label,
+                                  }))
+                                }}
+                              />
+                              {issue?.label && (
+                                <span
+                                  class="field-error"
+                                  id={'label-error-' + block.id}
+                                >
+                                  {t(issue.label)}
+                                </span>
+                              )}
+                            </label>
+                            <label class="field">
+                              <span class="field-label">URL</span>
+                              <input
+                                id={'url-' + block.id}
+                                type="url"
+                                value={block.url}
+                                maxLength={limits.url}
+                                placeholder="https://example.com"
+                                aria-invalid={Boolean(issue?.url)}
+                                aria-describedby={
+                                  issue?.url
+                                    ? 'url-error-' + block.id
+                                    : undefined
+                                }
+                                onInput={(event) => {
+                                  const url = fieldValue(event.currentTarget)
+                                  editLink(block.id, (current) => ({
+                                    ...current,
+                                    url,
+                                  }))
+                                }}
+                              />
+                              {issue?.url && (
+                                <span
+                                  class="field-error"
+                                  id={'url-error-' + block.id}
+                                >
+                                  {t(issue.url)}
+                                </span>
+                              )}
+                            </label>
+                            {block.type === 'icon' && (
+                              <IconLinkFields
+                                link={block}
+                                update={(edit) =>
+                                  editLink(block.id, (current) =>
+                                    current.type === 'icon'
+                                      ? edit(current)
+                                      : current,
+                                  )
+                                }
+                              />
+                            )}
+                          </fieldset>
+                        )
+                      })}
+                      <button
+                        id={type === 'icon' ? 'add-icon-link' : 'add-link'}
+                        class="button button-outline add-link"
+                        disabled={doc.blocks.length >= limits.blocks}
+                        onClick={() => addLink(type)}
+                      >
+                        <Icon name="plus" />{' '}
+                        {t(type === 'icon' ? 'Add icon link' : 'Add link')}
+                      </button>
+                    </section>
                   )
                 })}
-                <button
-                  id="add-link"
-                  class="button button-outline add-link"
-                  disabled={doc.blocks.length >= limits.blocks}
-                  onClick={addLink}
-                >
-                  <Icon name="plus" /> {t('Add link')}
-                </button>
                 {doc.blocks.length >= limits.blocks && (
                   <p class="empty-message">
                     {t('This profile has the maximum of {value} links.', {

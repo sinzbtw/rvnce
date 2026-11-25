@@ -13,7 +13,7 @@ Rvnce is an open-source editor for personal bio pages. Start with a preset, make
 ## Make a profile
 
 1. In **Profile**, add a name, bio, page language, photo, and an optional **Browser tab icon**. A PNG, JPEG, or WebP icon is fitted into a 64 × 64 PNG and included in the exported site. **Show Made with Rvnce** is on for new profiles and can be turned off or on at any time.
-2. In **Links**, add and reorder up to 24 destinations.
+2. In **Links**, add up to 24 destinations. Button links and icon links are ordered separately. Icon links detect supported sites and can use a custom image in its original colors or tinted to the profile palette.
 3. In **Appearance**, choose a preset and a light or dark palette. Background, page overlay, click effects, name effects, cursor and trail, and the profile entrance can be adjusted in their own preview dialogs. Enable name sparkles and text styling independently. **Examples** opens published profiles in separate tabs.
 4. Download **Export JSON** for a full backup, **Export theme** to share just the appearance and its background, or **Download site** to publish.
 
@@ -26,7 +26,7 @@ Rvnce saves one draft per browser origin. If another tab changes the draft, expo
 - Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB in any duration. Both motion formats are limited to 1920 × 1080.
 - A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
 - Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v5 and theme schema v2. Profiles v1–v4 and themes v1 import with the new effects off. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
-- Custom cursors accept PNG, JPEG, or WebP up to 4 MiB. Rvnce converts the image to PNG and fits it within 32 × 32 pixels.
+- Cursor and link icon images accept PNG, JPEG, or WebP up to 4 MiB. Rvnce converts them to PNG and fits them within 32 × 32 and 64 × 64 pixels respectively.
 
 [Watch a short editor walkthrough](docs/images/appearance.gif).
 

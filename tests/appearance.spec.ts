@@ -216,6 +216,98 @@ test('effect dialogs preview immediately, restore focus, and match the static ex
   ).toBeLessThanOrEqual(390)
 })
 
+test('orders button and icon links independently and exports accessible social icons', async ({
+  page,
+  browser,
+  browserName,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Show preview' }).click()
+  await page.getByLabel('Display name').fill('Mira Park')
+  await page.getByRole('button', { name: 'Links' }).click()
+  async function add(kind: 'button' | 'icon', label: string, url: string) {
+    await page
+      .getByRole('button', {
+        name: kind === 'icon' ? 'Add icon link' : 'Add link',
+        exact: true,
+      })
+      .click()
+    const group = page
+      .getByRole('group', {
+        name: kind === 'icon' ? /^Icon link \d/ : /^Link \d/,
+      })
+      .last()
+    await group.getByLabel('Label').fill(label)
+    await group.getByLabel('URL').fill(url)
+    return group
+  }
+  await add('button', 'Portfolio', 'https://example.com/portfolio')
+  const github = await add(
+    'icon',
+    'GitHub projects',
+    'https://github.com/sinzbtw/rvnce',
+  )
+  await expect(
+    github.getByLabel('Icon', { exact: true }).locator('option:checked'),
+  ).toHaveText('Automatic · GitHub')
+  await add('button', 'Writing', 'https://example.com/writing')
+  const custom = await add('icon', 'My studio', 'https://example.com/')
+  await custom.locator('input[type=file]').setInputFiles({
+    name: 'studio.png',
+    mimeType: 'image/png',
+    buffer: await readFile(photo),
+  })
+  await expect(custom.getByLabel('Icon', { exact: true })).toHaveValue('custom')
+  await custom.getByLabel('Tint icon with profile colors').check()
+  await page.getByRole('button', { name: 'Move My studio up' }).click()
+  await expect(page.locator('.profile-links li')).toHaveText([
+    'Portfolio',
+    'Writing',
+  ])
+  await expect(page.locator('.profile-social li')).toHaveText([
+    'My studio',
+    'GitHub projects',
+  ])
+  await expect(page.locator('.profile-social-tint')).toHaveCSS(
+    'mask-image',
+    /data:image\/png/,
+  )
+
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(archive['icons/link-1.png']).toBeDefined()
+  expect(strFromU8(archive['profile.css']!)).toContain(
+    'url("./icons/link-1.png")',
+  )
+  const host = await serveArchive(archive)
+  const context = await browser.newContext({ javaScriptEnabled: false })
+  try {
+    const published = await context.newPage()
+    const iconRequest = published.waitForResponse(
+      (response) => response.url() === host.url + 'icons/link-1.png',
+    )
+    await published.goto(host.url)
+    expect((await iconRequest).ok()).toBe(true)
+    const social = published.getByRole('list', { name: 'Social links' })
+    const studio = social.getByRole('link', { name: 'My studio' })
+    await expect(studio).toHaveAttribute('href', 'https://example.com/')
+    await expect(
+      social.getByRole('link', { name: 'GitHub projects' }),
+    ).toHaveAttribute('href', 'https://github.com/sinzbtw/rvnce')
+    if (browserName === 'webkit') {
+      await studio.focus()
+    } else {
+      await published.keyboard.press('Tab')
+      await published.keyboard.press('Tab')
+      await published.keyboard.press('Tab')
+    }
+    await expect(studio).toBeFocused()
+    await expect(studio).toHaveCSS('outline-style', 'solid')
+  } finally {
+    await context.close()
+    await host.close()
+  }
+})
+
 test('keeps branding independent of portable themes and restores the full draft', async ({
   page,
 }) => {

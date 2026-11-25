@@ -4,19 +4,23 @@ import {
   profileLanguage,
   type ProfileDocument,
 } from '../profile/document'
+import { iconForUrl } from '../profile/effects'
 import { imageVariable, profileVariables } from './appearance-css'
+import { SocialIcon } from './SocialIcon'
 
 export interface ProfileAssets {
   avatarUrl: string | null
   backgroundUrl?: string | undefined
   posterUrl?: string | undefined
   cursorUrl?: string | undefined
+  iconUrls?: Record<string, string>
 }
 
 interface PreviewLabels {
   locale: string
   name: string
   links: string
+  iconLinks: string
   credit: string
   playBackground: string
   stopBackground: string
@@ -44,7 +48,7 @@ export function PublicProfile({
   previewLabels?: PreviewLabels
 }) {
   const { profile, appearance, blocks } = doc
-  const { avatarUrl, backgroundUrl, posterUrl, cursorUrl } = assets
+  const { avatarUrl, backgroundUrl, posterUrl, cursorUrl, iconUrls } = assets
   const {
     cursor,
     trail,
@@ -53,6 +57,8 @@ export function PublicProfile({
     name: nameEffect,
     sparkles,
   } = appearance.effects
+  const buttons = blocks.filter((block) => block.type === 'link')
+  const icons = blocks.filter((block) => block.type === 'icon')
   const media = appearance.background.media
   const motion = media && 'poster' in media && backgroundUrl && posterUrl
   const enteredName = profile.name.trim()
@@ -176,14 +182,14 @@ export function PublicProfile({
             <p class="profile-bio">{profile.bio.trim()}</p>
           )}
         </header>
-        {blocks.length > 0 && (
+        {buttons.length > 0 && (
           <ul
             class="profile-links"
             aria-label={previewLabels?.links ?? 'Profile links'}
             lang={previewLocale}
             role="list"
           >
-            {blocks.map((block) => {
+            {buttons.map((block) => {
               const content = (
                 <>
                   <span>{block.label.trim()}</span>
@@ -212,6 +218,70 @@ export function PublicProfile({
                     <a
                       class="profile-link"
                       href={block.url.trim()}
+                      rel="noreferrer"
+                    >
+                      {content}
+                    </a>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {icons.length > 0 && (
+          <ul
+            class="profile-social"
+            aria-label={previewLabels?.iconLinks ?? 'Social links'}
+            lang={previewLocale}
+            role="list"
+          >
+            {icons.map((link, index) => {
+              const url = Object.hasOwn(iconUrls ?? {}, link.id)
+                ? iconUrls?.[link.id]
+                : undefined
+              const custom = link.icon === 'custom' && url
+              const icon =
+                link.icon === 'auto'
+                  ? iconForUrl(link.url)
+                  : link.icon === 'custom'
+                    ? 'website'
+                    : link.icon
+              const content = (
+                <>
+                  {custom ? (
+                    link.tint ? (
+                      <span
+                        class="profile-social-tint"
+                        aria-hidden="true"
+                        style={
+                          preview
+                            ? { '--icon-image': imageVariable(custom) }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <img width="22" height="22" src={custom} alt="" />
+                    )
+                  ) : (
+                    <SocialIcon icon={icon} />
+                  )}
+                  <span class="profile-link-label">{link.label.trim()}</span>
+                </>
+              )
+              return (
+                <li
+                  key={link.id}
+                  data-icon-slot={index}
+                  lang={previewLocale ? language : undefined}
+                >
+                  {preview ? (
+                    <span class="profile-social-link" title={link.label.trim()}>
+                      {content}
+                    </span>
+                  ) : (
+                    <a
+                      class="profile-social-link"
+                      href={link.url.trim()}
                       rel="noreferrer"
                     >
                       {content}

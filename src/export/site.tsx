@@ -36,7 +36,7 @@ export function siteFiles(
   doc: ProfileDocument,
   assets: SiteAssets,
 ): Record<string, string | Uint8Array> {
-  const { appearance, profile } = doc
+  const { appearance, profile, blocks } = doc
   const avatar =
     assets.avatar ?? (profile.avatar && avatarBytes(profile.avatar))
   const favicon =
@@ -51,6 +51,26 @@ export function siteFiles(
     cursor.preset === 'custom' && cursor.image
       ? accessoryBytes(cursor.image, 'cursor')
       : null
+  const iconFiles: Record<string, Uint8Array> = {}
+  const iconUrls: [string, string][] = []
+  const masks: string[] = []
+  blocks
+    .filter((block) => block.type === 'icon')
+    .forEach((link, index) => {
+      if (link.icon !== 'custom' || !link.image) return
+      const path = 'icons/link-' + (index + 1) + '.png'
+      const url = './' + path
+      iconFiles[path] = accessoryBytes(link.image, 'icon')
+      iconUrls.push([link.id, url])
+      if (link.tint)
+        masks.push(
+          '[data-icon-slot="' +
+            index +
+            '"]{--icon-image:' +
+            imageVariable(url) +
+            '}',
+        )
+    })
   if (motion && !assets.motionScript)
     throw new Error('The background player could not be loaded.')
   if (pointer && !assets.pointerScript)
@@ -88,6 +108,7 @@ export function siteFiles(
               avatarUrl: avatar ? './avatar.png' : null,
               backgroundUrl: filename ? './' + filename : undefined,
               posterUrl: motion ? './background-poster.jpg' : undefined,
+              iconUrls: Object.fromEntries(iconUrls),
             }}
           />
         </main>
@@ -110,6 +131,7 @@ export function siteFiles(
         .join(';') +
       '}',
     assets.css,
+    ...masks,
   ].join('\n')
 
   return {
@@ -126,6 +148,7 @@ export function siteFiles(
     ...(avatar ? { 'avatar.png': avatar } : {}),
     ...(favicon ? { 'favicon.png': favicon } : {}),
     ...(cursorFile ? { 'cursor.png': cursorFile } : {}),
+    ...iconFiles,
     ...(pointer ? { 'pointer-effects.js': assets.pointerScript! } : {}),
     ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),
     ...(motion

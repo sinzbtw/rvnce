@@ -17,6 +17,13 @@ export function ProfilePreview({
   const t = useCopy()
   const media = usePreviewMedia(shown ? doc.appearance.background.media : null)
   const cursor = doc.appearance.effects.cursor
+  const iconUrls = Object.fromEntries(
+    doc.blocks.flatMap((block) =>
+      block.type === 'icon' && block.icon === 'custom' && block.image
+        ? [[block.id, pngDataUrl(block.image)]]
+        : [],
+    ),
+  )
   return (
     <PublicProfile
       doc={doc}
@@ -26,6 +33,7 @@ export function ProfilePreview({
           cursor.preset === 'custom' && cursor.image
             ? pngDataUrl(cursor.image)
             : undefined,
+        iconUrls,
         ...media,
       }}
       preview
@@ -33,6 +41,7 @@ export function ProfilePreview({
         locale,
         name: t('Your name'),
         links: t('Profile links'),
+        iconLinks: t('Social links'),
         credit: t('Made with Rvnce'),
         playBackground: t('Play background'),
         stopBackground: t('Stop background'),

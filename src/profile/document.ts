@@ -1,10 +1,16 @@
 import {
   parseAppearance,
+  member,
   presetAppearance,
   type Appearance,
 } from './appearance'
 import { accentInk } from './colors'
-import { defaultEffects } from './effects'
+import {
+  accessoryBytes,
+  defaultEffects,
+  socialIcons,
+  type SocialIcon,
+} from './effects'
 import { hasKeys, isHex, record } from './shape'
 
 export const officialEditor = 'https://sinzbtw.github.io/rvnce/'
@@ -26,12 +32,20 @@ export const limits = {
   documentBytes: 16 * 1024 * 1024,
 }
 
-export interface LinkBlock {
+interface LinkFields {
   id: string
-  type: 'link'
   label: string
   url: string
 }
+
+export interface IconLink extends LinkFields {
+  type: 'icon'
+  icon: SocialIcon
+  image: string | null
+  tint: boolean
+}
+
+export type LinkBlock = (LinkFields & { type: 'link' }) | IconLink
 
 export const profileVersion = 5
 export const themeVersion = 2
@@ -290,13 +304,17 @@ export function validateProfile(
 
   const identifiers = new Set<string>()
   const parsedBlocks = blocks.map((block: unknown): LinkBlock => {
-    if (!hasKeys(block, ['type', 'id', 'label', 'url'])) {
+    const icon =
+      version === profileVersion && record(block) && block.type === 'icon'
+    const keys = ['type', 'id', 'label', 'url']
+    if (icon) keys.push('icon', 'image', 'tint')
+    if (!hasKeys(block, keys)) {
       throw new Error('A link block is invalid.')
     }
     const label = field(block.label)
     const url = field(block.url)
     if (
-      block.type !== 'link' ||
+      (!icon && block.type !== 'link') ||
       typeof block.id !== 'string' ||
       !/^[a-z0-9_-]{1,80}$/i.test(block.id) ||
       identifiers.has(block.id) ||
@@ -306,6 +324,25 @@ export function validateProfile(
       throw new Error('A link block is invalid.')
     }
     identifiers.add(block.id)
+    if (icon) {
+      if (
+        !member(socialIcons)(block.icon) ||
+        typeof block.tint !== 'boolean' ||
+        (block.image !== null && typeof block.image !== 'string') ||
+        (block.icon === 'custom' && block.image === null)
+      )
+        throw new Error('A link block is invalid.')
+      if (block.image !== null) accessoryBytes(block.image, 'icon')
+      return {
+        id: block.id,
+        type: 'icon',
+        label,
+        url,
+        icon: block.icon,
+        image: block.image,
+        tint: block.tint,
+      }
+    }
     return { id: block.id, type: 'link', label, url }
   })
   const doc: ProfileDocument = {

@@ -29,7 +29,7 @@ flowchart LR
 ## Boundaries
 
 - **Profile and theme.** [ProfileDocument](src/profile/document.ts) v5 contains
-  profile details, ordered links, appearance, an optional
+  profile details, ordered button and icon links, appearance, an optional
   credit and a browser tab icon. A theme v2 file carries appearance and its
   assets, including the background and any custom cursor. Profile
   v1 and v2 migrate to Graphic with the original palette, accent and disabled

@@ -3,6 +3,47 @@
   width: 100%;
 }
 
+.profile-social {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: var(--profile-align);
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-social-link {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: max(6px, min(var(--link-radius), 14px));
+  background: var(--link-bg);
+  color: var(--link-text);
+}
+
+.profile-social-link img {
+  object-fit: contain;
+}
+
+.profile-social-tint {
+  width: 22px;
+  height: 22px;
+  background: currentColor;
+  mask: var(--icon-image) center / contain no-repeat;
+}
+
+.profile-link-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 @media (any-pointer: fine) {
   .public-profile[data-cursor='cell'] {
     cursor: cell;
@@ -299,6 +340,10 @@
   .profile-name-text[data-name-effect='gradient'] {
     color: CanvasText;
     background: none;
+  }
+  .profile-social-tint {
+    background: LinkText;
+    forced-color-adjust: none;
   }
 }
 

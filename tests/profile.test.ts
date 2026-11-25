@@ -313,6 +313,31 @@ describe('standalone public site', () => {
     doc.appearance.effects.overlay.preset = 'grain'
     expect(siteFiles(doc, assets)['pointer-effects.js']).toBeUndefined()
   })
+
+  it('rejects unvalidated custom icons and detects only supported hostnames', () => {
+    const doc = demoProfile(null)
+    doc.blocks.push({
+      type: 'icon',
+      id: 'social',
+      label: 'My website',
+      url: 'https://github.com.example.org/',
+      icon: 'auto',
+      image: null,
+      tint: false,
+    })
+    expect(parseProfile(JSON.stringify(doc))).toEqual(doc)
+    expect(siteFiles(doc, emptyAssets)['index.html']).toContain('M3 12h18M12 3')
+    doc.blocks[3] = {
+      type: 'icon',
+      id: 'social',
+      label: 'Custom',
+      url: 'https://example.org/',
+      icon: 'custom',
+      image: samplePng.toString('base64'),
+      tint: false,
+    }
+    expect(() => parseProfile(JSON.stringify(doc))).toThrow('custom link icon')
+  })
 })
 
 describe('avatar upload dimensions', () => {
