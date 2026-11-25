@@ -23,7 +23,7 @@ Rvnce saves one draft per browser origin. If another tab changes the draft, expo
 
 ## Backgrounds and backups
 
-- Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB and 15 seconds. Both motion formats are limited to 1920 × 1080.
+- Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB in any duration. Both motion formats are limited to 1920 × 1080.
 - A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
 - Profile and theme JSON files can be up to 16 MiB. Profile backups use schema v4 and include the optional tab icon. Existing v1–v3 profiles can be imported. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
 

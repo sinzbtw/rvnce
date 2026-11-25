@@ -13,7 +13,6 @@ export const mediaLimits = {
   motionHeight: 1080,
   gifFrames: 240,
   gifPixels: 120_000_000,
-  videoSeconds: 15,
 }
 
 export type BackgroundMedia =
@@ -183,14 +182,9 @@ export function checkMp4(bytes: Uint8Array<ArrayBuffer>): void {
       ? Number(data.getBigUint64(header.start + 24))
       : data.getUint32(header.start + 16)
   const sizeError = () => {
-    throw new Error('Choose a video up to 15 seconds and 1920 × 1080 pixels.')
+    throw new Error('Choose a video up to 1920 × 1080 pixels.')
   }
-  if (
-    !timescale ||
-    !duration ||
-    duration / timescale > mediaLimits.videoSeconds
-  )
-    return sizeError()
+  if (!timescale || !duration) return invalid()
   let videoTracks = 0
   for (const track of boxes(movie.start, movie.end).filter(
     ({ type }) => type === 'trak',

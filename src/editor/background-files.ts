@@ -86,16 +86,9 @@ async function withVideo<T>(
           !video.videoWidth ||
           !video.videoHeight ||
           video.videoWidth > mediaLimits.motionWidth ||
-          video.videoHeight > mediaLimits.motionHeight ||
-          !Number.isFinite(video.duration) ||
-          video.duration <= 0 ||
-          video.duration > mediaLimits.videoSeconds
+          video.videoHeight > mediaLimits.motionHeight
         ) {
-          reject(
-            new Error(
-              'Choose a video up to 15 seconds and 1920 × 1080 pixels.',
-            ),
-          )
+          reject(new Error('Choose a video up to 1920 × 1080 pixels.'))
         }
       }
       video.onloadeddata = () => resolve()

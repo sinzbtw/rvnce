@@ -683,14 +683,13 @@ export const messages = {
     'Les fichiers animés d’origine conservent leurs métadonnées. Les MP4 peuvent contenir du son.',
     'Originaldateien behalten ihre Metadaten. MP4-Dateien können Ton enthalten.',
   ],
-  'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB and 15 seconds.':
-    [
-      'PNG, JPEG или WebP до 8 МиБ. GIF до 3 МиБ. MP4 H.264 до 8 МиБ и 15 секунд.',
-      'PNG, JPEG o WebP hasta 8 MiB. GIF hasta 3 MiB. MP4 H.264 hasta 8 MiB y 15 segundos.',
-      'PNG, JPEG ou WebP até 8 MiB. GIF até 3 MiB. MP4 H.264 até 8 MiB e 15 segundos.',
-      'PNG, JPEG ou WebP jusqu’à 8 Mio. GIF jusqu’à 3 Mio. MP4 H.264 jusqu’à 8 Mio et 15 secondes.',
-      'PNG, JPEG oder WebP bis 8 MiB. GIF bis 3 MiB. H.264-MP4 bis 8 MiB und 15 Sekunden.',
-    ],
+  'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB.': [
+    'PNG, JPEG или WebP до 8 МиБ. GIF до 3 МиБ. MP4 H.264 до 8 МиБ.',
+    'PNG, JPEG o WebP hasta 8 MiB. GIF hasta 3 MiB. MP4 H.264 hasta 8 MiB.',
+    'PNG, JPEG ou WebP até 8 MiB. GIF até 3 MiB. MP4 H.264 até 8 MiB.',
+    'PNG, JPEG ou WebP jusqu’à 8 Mio. GIF jusqu’à 3 Mio. MP4 H.264 jusqu’à 8 Mio.',
+    'PNG, JPEG oder WebP bis 8 MiB. GIF bis 3 MiB. H.264-MP4 bis 8 MiB.',
+  ],
   'Background group': [
     'Настройки фона',
     'Ajustes del fondo',
@@ -1379,12 +1378,12 @@ export const messages = {
     'Choisissez un MP4 lisible encodé en H.264.',
     'Wähle eine lesbare MP4-Datei mit H.264-Kodierung.',
   ],
-  'Choose a video up to 15 seconds and 1920 × 1080 pixels.': [
-    'Выберите видео до 15 секунд и 1920 × 1080 пикселей.',
-    'Elige un vídeo de hasta 15 segundos y 1920 × 1080 píxeles.',
-    'Escolha um vídeo de até 15 segundos e 1920 × 1080 pixels.',
-    'Choisissez une vidéo de 15 secondes et 1920 × 1080 pixels au maximum.',
-    'Wähle ein Video mit höchstens 15 Sekunden und 1920 × 1080 Pixeln.',
+  'Choose a video up to 1920 × 1080 pixels.': [
+    'Выберите видео с разрешением до 1920 × 1080 пикселей.',
+    'Elige un vídeo de hasta 1920 × 1080 píxeles.',
+    'Escolha um vídeo de até 1920 × 1080 pixels.',
+    'Choisissez une vidéo de 1920 × 1080 pixels au maximum.',
+    'Wähle ein Video mit höchstens 1920 × 1080 Pixeln.',
   ],
   'The background file is missing.': [
     'Файл фона отсутствует.',

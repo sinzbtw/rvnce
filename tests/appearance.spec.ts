@@ -210,6 +210,8 @@ for (const extension of ['gif', 'mp4'] as const) {
           'data-playing',
           '',
         )
+        if (extension === 'mp4')
+          await expect(motion).toHaveJSProperty('duration', 20)
         await page.getByRole('button', { name: 'Stop background' }).click()
         await expect(page.locator('rvnce-motion')).not.toHaveAttribute(
           'data-playing',
@@ -271,6 +273,23 @@ for (const extension of ['gif', 'mp4'] as const) {
           'data-playing',
           '',
         )
+        if (extension === 'mp4') {
+          const video = animated.locator('video')
+          await expect(video).toHaveJSProperty('duration', 20)
+          await video.evaluate((element: HTMLVideoElement) => {
+            element.currentTime = 16
+          })
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) =>
+                  element.currentTime >= 16 &&
+                  !element.seeking &&
+                  !element.paused,
+              ),
+            )
+            .toBe(true)
+        }
         await animated.getByRole('button', { name: 'Stop background' }).click()
         await expect(animated.locator('rvnce-motion')).not.toHaveAttribute(
           'data-playing',

@@ -663,7 +663,7 @@ export function AppearanceEditor({
           ) : (
             <p class="hint">
               {t(
-                'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB and 15 seconds.',
+                'PNG, JPEG or WebP up to 8 MiB. GIF up to 3 MiB. H.264 MP4 up to 8 MiB.',
               )}
             </p>
           )}
