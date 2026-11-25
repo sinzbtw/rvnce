@@ -10,11 +10,17 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const dev = process.argv.includes('--dev')
 const output = join(root, dev ? '.cache/dev-public' : 'dist')
 
-const [avatar, css, favicon] = await Promise.all([
-  readFile(join(root, 'src/assets/mira-park.png')),
-  readFile(join(root, 'src/public/profile.css'), 'utf8'),
-  readFile(join(root, 'src/assets/rvnce-mark.png')),
-])
+const [avatar, css, favicon, lucideLicense, fontAwesomeLicense] =
+  await Promise.all([
+    readFile(join(root, 'src/assets/mira-park.png')),
+    readFile(join(root, 'src/public/profile.css'), 'utf8'),
+    readFile(join(root, 'src/assets/rvnce-mark.png')),
+    readFile(join(root, 'node_modules/lucide-preact/LICENSE'), 'utf8'),
+    readFile(
+      join(root, 'node_modules/@fortawesome/free-brands-svg-icons/LICENSE.txt'),
+      'utf8',
+    ),
+  ])
 
 async function loadFont(family: FontName) {
   const font = join(root, 'node_modules', '@fontsource-variable', family)
@@ -42,7 +48,13 @@ await Promise.all(
     const graphic = example.preset === 'graphic'
     const doc = demoProfile(graphic ? avatar.toString('base64') : null, example)
     const font = fonts.get(doc.appearance.typography.font)!
-    const files = siteFiles(doc, { css, favicon, ...font })
+    const files = siteFiles(doc, {
+      css,
+      favicon,
+      lucideLicense,
+      fontAwesomeLicense,
+      ...font,
+    })
     await Promise.all(
       Object.entries(files).map(async ([name, content]) => {
         const target = join(output, 'demo', graphic ? '' : example.preset, name)
@@ -60,6 +72,11 @@ if (!dev) {
   )
   await Promise.all([
     writeFile(join(output, 'assets', 'motion-LICENSE.txt'), motionLicense),
+    writeFile(join(output, 'assets', 'lucide-LICENSE.txt'), lucideLicense),
+    writeFile(
+      join(output, 'assets', 'font-awesome-LICENSE.txt'),
+      fontAwesomeLicense,
+    ),
     ...fontNames.map((family) =>
       writeFile(
         join(output, 'assets', family + '-OFL.txt'),

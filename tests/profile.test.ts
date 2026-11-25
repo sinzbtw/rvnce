@@ -27,6 +27,8 @@ const emptyAssets = {
     'manrope-cyrillic-wght-normal.woff2': new Uint8Array(),
   },
   fontLicense: new Uint8Array(),
+  lucideLicense: 'Lucide license',
+  fontAwesomeLicense: 'Font Awesome Brands license',
 }
 
 describe('Rvnce profile documents', () => {
@@ -275,6 +277,8 @@ describe('standalone public site', () => {
       'fonts/OFL.txt',
       'fonts/manrope-cyrillic.woff2',
       'fonts/manrope-latin.woff2',
+      'icons/Font-Awesome-LICENSE.txt',
+      'icons/Lucide-LICENSE.txt',
       'index.html',
       'profile.css',
     ])
@@ -293,6 +297,12 @@ describe('standalone public site', () => {
       './fonts/manrope-latin.woff2',
     )
     expect(unpacked['avatar.png']).toEqual(Uint8Array.from(samplePng))
+    expect(strFromU8(unpacked['icons/Lucide-LICENSE.txt']!)).toBe(
+      emptyAssets.lucideLicense,
+    )
+    expect(strFromU8(unpacked['icons/Font-Awesome-LICENSE.txt']!)).toBe(
+      emptyAssets.fontAwesomeLicense,
+    )
   })
 
   it('omits an absent avatar and renders initials', () => {
@@ -326,7 +336,7 @@ describe('standalone public site', () => {
       tint: false,
     })
     expect(parseProfile(JSON.stringify(doc))).toEqual(doc)
-    expect(siteFiles(doc, emptyAssets)['index.html']).toContain('M3 12h18M12 3')
+    expect(siteFiles(doc, emptyAssets)['index.html']).toContain('lucide-globe')
     doc.blocks[3] = {
       type: 'icon',
       id: 'social',

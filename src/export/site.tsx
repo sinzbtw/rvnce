@@ -26,6 +26,8 @@ interface SiteAssets {
   fontCss: string
   fonts: Record<string, Uint8Array>
   fontLicense: Uint8Array
+  lucideLicense: string
+  fontAwesomeLicense: string
   motionScript?: string | undefined
   pointerScript?: string | undefined
   avatar?: Uint8Array | undefined
@@ -145,6 +147,8 @@ export function siteFiles(
       ]),
     ),
     'fonts/OFL.txt': assets.fontLicense,
+    'icons/Font-Awesome-LICENSE.txt': assets.fontAwesomeLicense,
+    'icons/Lucide-LICENSE.txt': assets.lucideLicense,
     ...(avatar ? { 'avatar.png': avatar } : {}),
     ...(favicon ? { 'favicon.png': favicon } : {}),
     ...(cursorFile ? { 'cursor.png': cursorFile } : {}),

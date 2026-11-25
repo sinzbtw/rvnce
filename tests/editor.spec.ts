@@ -681,6 +681,13 @@ test('moves a floating preview and restores the mobile editing position', async 
   expect((await settings.boundingBox())!.x).toBeGreaterThanOrEqual(
     sidebar!.width,
   )
+  const panel = page.locator('.editor-panel')
+  const panelRight = () =>
+    panel.evaluate((el) => el.getBoundingClientRect().right)
+  const rightGutter = await settings.evaluate((el) =>
+    Number.parseFloat(getComputedStyle(el).paddingRight),
+  )
+  expect(await panelRight()).toBeCloseTo(1280 - rightGutter, 0)
   await page.getByRole('button', { name: 'Appearance', exact: true }).click()
   await page.getByText('Typography', { exact: true }).click()
   await page.getByText('Card and avatar', { exact: true }).click()
@@ -689,6 +696,7 @@ test('moves a floating preview and restores the mobile editing position', async 
   const grip = page.getByRole('button', { name: 'Move preview' })
   await expect(grip).toBeFocused()
   const initial = (await preview.boundingBox())!
+  expect(await panelRight()).toBeLessThan(initial.x)
   await page.evaluate(() => window.scrollTo(0, 640))
   await expect
     .poll(async () => (await preview.boundingBox())?.y)

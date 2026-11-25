@@ -5,6 +5,8 @@ import sansCss from '@fontsource-variable/source-sans-3/index.css?raw'
 import sansLicense from '@fontsource-variable/source-sans-3/LICENSE?raw'
 import serifCss from '@fontsource-variable/source-serif-4/index.css?raw'
 import serifLicense from '@fontsource-variable/source-serif-4/LICENSE?raw'
+import fontAwesomeLicense from '/node_modules/@fortawesome/free-brands-svg-icons/LICENSE.txt?raw'
+import lucideLicense from '/node_modules/lucide-preact/LICENSE?raw'
 import css from '../public/profile.css?raw'
 import motionScript from '../public/background-motion.js?raw'
 import pointerScript from '../public/pointer-effects.js?raw'
@@ -66,6 +68,8 @@ export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
     fontCss,
     fonts: Object.fromEntries(fonts),
     fontLicense: strToU8(fontLicense),
+    lucideLicense,
+    fontAwesomeLicense,
     avatar,
     favicon,
   })

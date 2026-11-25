@@ -268,11 +268,17 @@ button:disabled {
 }
 
 .workspace {
+  --preview-width: min(480px, 42vw);
+  --preview-inset: 20px;
   display: grid;
   grid-template-columns: clamp(176px, 17vw, 248px) minmax(0, 1fr);
   align-items: stretch;
   min-height: calc(100svh - var(--header-height));
   background: var(--surface);
+}
+
+.workspace:has(.preview-pane[data-device='phone']) {
+  --preview-width: min(384px, 38vw);
 }
 
 .editor-sidebar {
@@ -287,8 +293,10 @@ button:disabled {
   scroll-margin-top: var(--header-height);
 }
 
-.settings > * {
-  max-width: clamp(30rem, calc(100vw - 50rem), 40rem);
+@media (min-width: 860px) {
+  .workspace[data-desktop-preview='shown'] .settings {
+    padding-inline-end: calc(var(--preview-width) + 2 * var(--preview-inset));
+  }
 }
 
 .editor-heading {
@@ -621,9 +629,9 @@ fieldset legend {
 .preview-pane {
   position: fixed;
   z-index: 6;
-  inset-inline-end: 20px;
-  inset-block-end: 20px;
-  width: min(480px, 52vw);
+  inset-inline-end: var(--preview-inset);
+  inset-block-end: var(--preview-inset);
+  width: var(--preview-width);
   min-width: 0;
   border: 1px solid var(--input-line);
   border-radius: 14px;
@@ -634,10 +642,6 @@ fieldset legend {
   transition:
     opacity var(--reveal) var(--ease-out),
     display var(--reveal) allow-discrete;
-}
-
-.preview-pane[data-device='phone'] {
-  width: min(384px, 48vw);
 }
 
 .workspace[data-desktop-preview='hidden'] .preview-pane {
@@ -904,14 +908,13 @@ fieldset legend {
 }
 
 .settings-dialog-preview {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   border-inline-start: 1px solid var(--line);
 }
 
 .settings-preview-bar {
-  grid-row: 1;
   font-weight: 700;
 }
 
@@ -920,7 +923,7 @@ fieldset legend {
 }
 
 .settings-profile-scroll {
-  grid-row: 3;
+  min-height: 0;
   max-height: min(54dvh, 570px);
   overflow: auto;
   border: 1px solid var(--line);

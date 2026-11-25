@@ -1,3 +1,4 @@
+import { ArrowUpRight } from 'lucide-preact'
 import { h } from 'preact'
 import {
   officialEditor,
@@ -193,21 +194,11 @@ export function PublicProfile({
               const content = (
                 <>
                   <span>{block.label.trim()}</span>
-                  <svg
+                  <ArrowUpRight
                     aria-hidden="true"
-                    width="19"
-                    height="19"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <path
-                      d="M6 18 18 6M7 6h11v11"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
+                    size={19}
+                    strokeWidth={1.8}
+                  />
                 </>
               )
               return (

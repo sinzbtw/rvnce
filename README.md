@@ -28,6 +28,8 @@ Two more presets are available to browse. [Graphic](https://sinzbtw.github.io/rv
 
 ![The page overlay settings dialog shows preset, color, and intensity controls next to a preview of the profile](docs/images/appearance-preview.png)
 
+The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
+
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.
 
 Open **Settings** in the header to choose the editor language or the **System**, **Light**, or **Dark** editor theme. Rvnce remembers both choices in your browser. On a desktop, use the sidebar to switch sections and open **Preview** from the header when needed. You can drag the floating preview or move it with the arrow keys. On a phone, switch between **Editor** and **Preview**. The interface respects your reduced-motion preference.
@@ -70,3 +72,5 @@ Rvnce uses Preact, TypeScript, Vite, and Motion for editor animations. The edito
 See [Architecture](ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), [Roadmap](ROADMAP.md), and [Security](SECURITY.md).
 
 The source and original Rvnce mark are licensed under [MIT](LICENSE). Motion uses the [MIT license](https://github.com/motiondivision/motion/blob/main/LICENSE.md). Manrope, Source Sans 3, and Source Serif 4 use the SIL Open Font License. Each exported profile includes the selected family's license in `fonts/OFL.txt`.
+
+Editor and generic profile icons come from Lucide. Social logos come from Font Awesome Brands under CC BY 4.0 and use the profile’s link color. Exports include both icon license files in `icons/`. [Lucide license](https://github.com/lucide-icons/lucide/blob/1.79.0/LICENSE) · [Font Awesome Free license](https://fontawesome.com/license/free)

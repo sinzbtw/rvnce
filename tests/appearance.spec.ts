@@ -216,6 +216,39 @@ test('effect dialogs preview immediately, restore focus, and match the static ex
   ).toBeLessThanOrEqual(390)
 })
 
+test('fits the settings preview to short profiles and scrolls on phones', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Mira Park')
+  await page
+    .getByLabel('Bio')
+    .fill(
+      'Independent designer making posters, type, and other things destined for a wall.',
+    )
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+  await page.getByRole('button', { name: 'Background', exact: true }).click()
+  await page
+    .getByLabel('Background type', { exact: true })
+    .selectOption('radial')
+  const frame = page.getByRole('region', { name: 'Settings preview' })
+  await expect(frame.locator('.public-profile h1')).toHaveText('Mira Park')
+  expect(
+    await frame.evaluate(
+      (el) => el.clientHeight - el.firstElementChild!.clientHeight,
+    ),
+  ).toBe(0)
+
+  await page.setViewportSize({ width: 390, height: 700 })
+  await frame.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  await expect
+    .poll(() => frame.evaluate((el) => el.scrollTop))
+    .toBeGreaterThan(0)
+})
+
 test('orders button and icon links independently and exports accessible social icons', async ({
   page,
   browser,
@@ -275,6 +308,12 @@ test('orders button and icon links independently and exports accessible social i
 
   const archive = unzipSync(await download(page, 'Download site'))
   expect(archive['icons/link-1.png']).toBeDefined()
+  expect(strFromU8(archive['icons/Lucide-LICENSE.txt']!)).toContain(
+    'ISC License',
+  )
+  expect(strFromU8(archive['icons/Font-Awesome-LICENSE.txt']!)).toContain(
+    'CC BY 4.0',
+  )
   expect(strFromU8(archive['profile.css']!)).toContain(
     'url("./icons/link-1.png")',
   )
@@ -290,9 +329,12 @@ test('orders button and icon links independently and exports accessible social i
     const social = published.getByRole('list', { name: 'Social links' })
     const studio = social.getByRole('link', { name: 'My studio' })
     await expect(studio).toHaveAttribute('href', 'https://example.com/')
-    await expect(
-      social.getByRole('link', { name: 'GitHub projects' }),
-    ).toHaveAttribute('href', 'https://github.com/sinzbtw/rvnce')
+    const githubLink = social.getByRole('link', { name: 'GitHub projects' })
+    await expect(githubLink).toHaveAttribute(
+      'href',
+      'https://github.com/sinzbtw/rvnce',
+    )
+    await expect(githubLink.locator('svg.fa-github')).toBeVisible()
     if (browserName === 'webkit') {
       await studio.focus()
     } else {
