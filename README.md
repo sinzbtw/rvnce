@@ -2,20 +2,33 @@
 
 [English](README.md) · [Русский](README.ru.md)
 
-Rvnce is an open-source editor for personal bio pages. Start with a preset, make it yours, and download a standalone site you can host yourself.
+Rvnce is an open-source editor for personal bio pages. Build a page for your work and links, see it as visitors will, and download a standalone site you can host yourself.
 
-[Open the editor](https://sinzbtw.github.io/rvnce/) · [Graphic](https://sinzbtw.github.io/rvnce/demo/) · [Minimal](https://sinzbtw.github.io/rvnce/demo/minimal/) · [Midnight](https://sinzbtw.github.io/rvnce/demo/midnight/) · [Glass](https://sinzbtw.github.io/rvnce/demo/glass/) · [Neon](https://sinzbtw.github.io/rvnce/demo/neon/)
+**[Open the live editor](https://sinzbtw.github.io/rvnce/)**
 
-![Rvnce appearance editor and live profile preview](docs/images/editor.png)
+![The Rvnce appearance editor beside Mira Park’s profile preview, with a photo, link buttons, and a row of social icons](docs/images/editor.png)
 
-![Five profiles rendered with the built-in presets](docs/images/presets.png)
+[Make a profile](#make-a-profile) · [Run locally](#run-locally) · [Publish a profile](#publish-a-profile) · [Contribute](CONTRIBUTING.md)
+
+## Finished profiles
+
+![Three published Rvnce profiles: Lina Moreno on a light serif layout, Studio Vesper on a dark gradient card, and Patch Signal on a dark green layout](docs/images/presets.png)
+
+- **Minimal** pairs serif type with a quiet palette for a writer’s links. [Open Lina Moreno](https://sinzbtw.github.io/rvnce/demo/minimal/)
+- **Midnight** gives a film and sound studio a dark gradient and warm accents. [Open Studio Vesper](https://sinzbtw.github.io/rvnce/demo/midnight/)
+- **Neon** uses high-contrast green outlines for a creative coding portfolio. [Open Patch Signal](https://sinzbtw.github.io/rvnce/demo/neon/)
+
+Two more presets are available to browse. [Graphic](https://sinzbtw.github.io/rvnce/demo/) · [Glass](https://sinzbtw.github.io/rvnce/demo/glass/)
 
 ## Make a profile
 
-1. In **Profile**, add a name, bio, page language, photo, and an optional **Browser tab icon**. A PNG, JPEG, or WebP icon is fitted into a 64 × 64 PNG and included in the exported site. **Show Made with Rvnce** is on for new profiles and can be turned off or on at any time.
-2. In **Links**, add up to 24 destinations. Button links and icon links are ordered separately. Icon links detect supported sites and can use a custom image in its original colors or tinted to the profile palette.
-3. In **Appearance**, choose a preset and a light or dark palette. Background, page overlay, click effects, name effects, cursor and trail, and the profile entrance can be adjusted in their own preview dialogs. Enable name sparkles and text styling independently. **Examples** opens published profiles in separate tabs.
-4. Download **Export JSON** for a full backup, **Export theme** to share just the appearance and its background, or **Download site** to publish.
+1. **Customize.** Add a name, bio, page language, and photo in **Profile**. Add up to 24 destinations in **Links** and reorder button links and icon links separately. Icon links detect supported websites and can use an uploaded image in its original colors or tinted to match your profile. In **Appearance**, choose a preset and tune the background, fonts, card, avatar, link style, and effects.
+2. **Preview.** Open **Preview**, switch between desktop and phone widths, and use **Examples** to open published profiles. Background, entrance animation, cursor and trail, page overlay, click effects, and name effects have their own preview dialogs. Move or click inside a dialog’s preview to try pointer effects. Name sparkles and text styling can be enabled independently.
+3. **Export.** Use **Export JSON** for a full backup, **Export theme** for appearance and its assets, or **Download site** to publish the standalone ZIP.
+
+![The page overlay settings dialog shows preset, color, and intensity controls next to a preview of the profile](docs/images/appearance-preview.png)
+
+In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.
 
 Open **Settings** in the header to choose the editor language or the **System**, **Light**, or **Dark** editor theme. Rvnce remembers both choices in your browser. On a desktop, use the sidebar to switch sections and open **Preview** from the header when needed. You can drag the floating preview or move it with the arrow keys. On a phone, switch between **Editor** and **Preview**. The interface respects your reduced-motion preference.
 
@@ -25,10 +38,8 @@ Rvnce saves one draft per browser origin. If another tab changes the draft, expo
 
 - Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB in any duration. Both motion formats are limited to 1920 × 1080.
 - A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
-- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v5 and theme schema v2. Profiles v1–v4 and themes v1 import with the new effects off. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
+- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v5 and theme schema v2. Profiles v1–v4 and themes v1 import with the new effects off and their original button links. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
 - Cursor and link icon images accept PNG, JPEG, or WebP up to 4 MiB. Rvnce converts them to PNG and fits them within 32 × 32 and 64 × 64 pixels respectively.
-
-[Watch a short editor walkthrough](docs/images/appearance.gif).
 
 ## Run locally
 
