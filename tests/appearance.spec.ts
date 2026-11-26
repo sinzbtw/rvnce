@@ -220,71 +220,151 @@ test('effect dialogs preview immediately, restore focus, and match the static ex
   ).toBeLessThanOrEqual(390)
 })
 
-test('new page overlays preview and export on light, dark, and media backgrounds', async ({
-  page,
-}) => {
-  await page.goto('/')
-  await page.getByLabel('Display name').fill('Mira Park')
-  await page.getByRole('button', { name: 'Appearance' }).click()
-  const trigger = page.getByRole('button', { name: 'Page overlay' })
-  const dialog = page.getByRole('dialog', { name: 'Page overlay' })
-  test.setTimeout(90_000)
-  for (const surface of ['light', 'dark', 'media']) {
-    if (surface === 'dark')
-      await page.getByRole('radio', { name: 'Dark' }).check()
-    if (surface === 'media') {
-      await page
-        .getByRole('button', { name: 'Background', exact: true })
-        .click()
-      const settings = page.getByRole('dialog', { name: 'Background' })
-      await settings
-        .getByLabel('Background file', { exact: true })
-        .setInputFiles({
-          name: 'backdrop.png',
-          mimeType: 'image/png',
-          buffer: await readFile(photo),
-        })
-      await expect(settings.locator('.profile-backdrop img')).toBeVisible()
-      await settings.getByRole('button', { name: 'Done' }).click()
-    }
-    for (const [preset, animation, selector] of [
-      ['glitch', 'glitch-band', 'span'],
-      ['matrix', 'matrix-fall', '.matrix-stream:not([hidden])'],
-      ['dust', 'overlay-float', 'i'],
-      ['embers', 'ember-rise', 'i'],
-    ] as const) {
-      await trigger.click()
-      await dialog
+for (const surface of ['light', 'dark', 'media']) {
+  test(
+    'new page overlays preview and export on ' + surface,
+    async ({ page }) => {
+      await page.goto('/')
+      await page.getByLabel('Display name').fill('Mira Park')
+      await page.getByRole('button', { name: 'Appearance' }).click()
+      const trigger = page.getByRole('button', { name: 'Page overlay' })
+      const dialog = page.getByRole('dialog', { name: 'Page overlay' })
+      test.setTimeout(65_000)
+      if (surface === 'dark')
+        await page.getByRole('radio', { name: 'Dark' }).check()
+      if (surface === 'media') {
+        await page
+          .getByRole('button', { name: 'Background', exact: true })
+          .click()
+        const settings = page.getByRole('dialog', { name: 'Background' })
+        await settings
+          .getByLabel('Background file', { exact: true })
+          .setInputFiles({
+            name: 'backdrop.png',
+            mimeType: 'image/png',
+            buffer: await readFile(photo),
+          })
+        await expect(settings.locator('.profile-backdrop img')).toBeVisible()
+        await settings.getByRole('button', { name: 'Done' }).click()
+      }
+      for (const [preset, animation, selector] of [
+        ['glitch', 'glitch-band', 'span'],
+        ['matrix', 'matrix-fall', '.matrix-stream:not([hidden])'],
+        ['dust', 'overlay-float', 'i'],
+        ['embers', 'ember-rise', 'i'],
+      ] as const) {
+        await trigger.click()
+        await dialog
+          .getByLabel('Overlay preset', { exact: true })
+          .selectOption(preset)
+        const layer = dialog.locator('.profile-overlay')
+        await expect(layer).toHaveCSS('pointer-events', 'none')
+        await expect(layer.locator(selector).first()).toHaveCSS(
+          'animation-name',
+          animation,
+        )
+        if (preset === 'matrix') {
+          await dialog.getByLabel('Rain density', { exact: true }).fill('100')
+          await expect(layer.locator(selector)).toHaveCount(18)
+        }
+        await dialog.getByRole('button', { name: 'Done' }).click()
+        const host = await serveArchive(
+          unzipSync(await download(page, 'Download site')),
+        )
+        const exported = await page.context().newPage()
+        try {
+          await exported.goto(host.url)
+          const marks = exported.locator('.profile-overlay').locator(selector)
+          await expect(marks.first()).toHaveCSS('animation-name', animation)
+          await exported.emulateMedia({ reducedMotion: 'reduce' })
+          await expect(marks.first()).toHaveCSS('animation-name', 'none')
+        } finally {
+          await exported.close()
+          await host.close()
+        }
+      }
+    },
+  )
+}
+
+for (const [preset, keyframe] of [
+  ['snow', 'overlay-drift'],
+  ['particles', 'overlay-float'],
+] as const) {
+  test(
+    preset + ' and name sparkles keep playing after 30 seconds',
+    async ({ page }) => {
+      test.setTimeout(60_000)
+      await page.goto('/')
+      await page.getByLabel('Display name').fill('Mira Park')
+      await page.getByRole('button', { name: 'Appearance' }).click()
+      await page.getByRole('button', { name: 'Page overlay' }).click()
+      const overlay = page.getByRole('dialog', { name: 'Page overlay' })
+      await overlay
         .getByLabel('Overlay preset', { exact: true })
         .selectOption(preset)
-      const layer = dialog.locator('.profile-overlay')
-      await expect(layer).toHaveCSS('pointer-events', 'none')
-      await expect(layer.locator(selector).first()).toHaveCSS(
-        'animation-name',
-        animation,
-      )
-      if (preset === 'matrix') {
-        await dialog.getByLabel('Rain density', { exact: true }).fill('100')
-        await expect(layer.locator(selector)).toHaveCount(18)
-      }
-      await dialog.getByRole('button', { name: 'Done' }).click()
+      await overlay.getByRole('button', { name: 'Done' }).click()
+      await page.getByRole('button', { name: 'Display name effects' }).click()
+      const name = page.getByRole('dialog', { name: 'Display name effects' })
+      await name.getByLabel('Sparkles around the name').check()
+      await name.getByLabel('Style the name text').check()
+      await name
+        .getByLabel('Name effect preset', { exact: true })
+        .selectOption('gradient')
+      await name.getByRole('button', { name: 'Done' }).click()
       const host = await serveArchive(
         unzipSync(await download(page, 'Download site')),
       )
-      const exported = await page.context().newPage()
+      const published = await page.context().newPage()
       try {
-        await exported.goto(host.url)
-        const marks = exported.locator('.profile-overlay').locator(selector)
-        await expect(marks.first()).toHaveCSS('animation-name', animation)
-        await exported.emulateMedia({ reducedMotion: 'reduce' })
-        await expect(marks.first()).toHaveCSS('animation-name', 'none')
+        await published.goto(host.url)
+        await page.getByRole('button', { name: 'Page overlay' }).click()
+        const motion = async (profile: ReturnType<Page['locator']>) =>
+          profile.evaluate((node) =>
+            node
+              .getAnimations({ subtree: true })
+              .filter(
+                (animation): animation is CSSAnimation =>
+                  animation instanceof CSSAnimation,
+              )
+              .map((animation) => ({
+                name: animation.animationName,
+                time: Number(animation.currentTime),
+                state: animation.playState,
+              })),
+          )
+        const previewProfile = overlay.locator('.public-profile')
+        const exportedProfile = published.locator('.public-profile')
+        const start = await Promise.all([
+          motion(previewProfile),
+          motion(exportedProfile),
+        ])
+        await new Promise<void>((resolve) => setTimeout(resolve, 30_100))
+        const end = await Promise.all([
+          motion(previewProfile),
+          motion(exportedProfile),
+        ])
+        for (const [index, animations] of end.entries()) {
+          for (const animation of [
+            keyframe,
+            'sparkle-glimmer',
+            'name-gradient',
+          ]) {
+            const initial = start[index]?.find(({ name }) => name === animation)
+            const later = animations.find(({ name }) => name === animation)
+            expect(later?.state).toBe('running')
+            expect((later?.time ?? 0) - (initial?.time ?? 0)).toBeGreaterThan(
+              29_000,
+            )
+          }
+        }
       } finally {
-        await exported.close()
+        await published.close()
         await host.close()
       }
-    }
-  }
-})
+    },
+  )
+}
 
 test('fits the settings preview to short profiles and scrolls on phones', async ({
   page,
@@ -669,3 +749,35 @@ for (const extension of ['gif', 'mp4'] as const) {
     },
   )
 }
+
+test('click effects finish and clear after a rapid series of clicks', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByRole('button', { name: 'Click effects' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Click effects' })
+  for (const preset of ['ripple', 'burst', 'sparkles']) {
+    await dialog
+      .getByLabel('Click effect preset', { exact: true })
+      .selectOption(preset)
+    const count = await dialog
+      .locator('.public-profile')
+      .evaluate((profile) => {
+        const { x, y } = profile.getBoundingClientRect()
+        for (let index = 0; index < 16; index++) {
+          profile.dispatchEvent(
+            new MouseEvent('click', {
+              bubbles: true,
+              detail: 1,
+              clientX: x + 25,
+              clientY: y + 25,
+            }),
+          )
+        }
+        return profile.querySelectorAll('.profile-pointer-mark').length
+      })
+    expect(count).toBe(1)
+    await expect(dialog.locator('.profile-pointer-mark')).toHaveCount(0)
+  }
+})

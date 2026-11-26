@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-preact'
 import { h } from 'preact'
+import { useId } from 'preact/hooks'
 import {
   officialEditor,
   profileLanguage,
@@ -58,6 +59,7 @@ export function PublicProfile({
   previewLabels?: PreviewLabels
 }) {
   const { profile, appearance, blocks } = doc
+  const grainId = useId()
   const { avatarUrl, backgroundUrl, posterUrl, cursorUrl, iconUrls } = assets
   const {
     cursor,
@@ -172,9 +174,40 @@ export function PublicProfile({
               <span />
               <span />
             </>
+          ) : overlay.preset === 'grain' ? (
+            <svg class="profile-grain" width="100%" height="100%">
+              <filter id={grainId}>
+                <feTurbulence
+                  type="fractalNoise"
+                  baseFrequency="0.84"
+                  numOctaves="3"
+                  stitchTiles="stitch"
+                />
+                <feColorMatrix type="saturate" values="0" />
+                <feComponentTransfer result="texture">
+                  <feFuncR type="linear" slope="2.2" intercept="-0.6" />
+                  <feFuncG type="linear" slope="2.2" intercept="-0.6" />
+                  <feFuncB type="linear" slope="2.2" intercept="-0.6" />
+                </feComponentTransfer>
+                <feFlood flood-color={overlay.color} result="tint" />
+                <feBlend mode="multiply" in="texture" in2="tint" />
+              </filter>
+              <rect
+                width="100%"
+                height="100%"
+                filter={'url(#' + grainId + ')'}
+              />
+            </svg>
           ) : (
-            overlay.preset !== 'grain' &&
-            Array.from({ length: 12 }, (_, index) => <i key={index} />)
+            Array.from(
+              {
+                length:
+                  overlay.preset === 'snow' || overlay.preset === 'particles'
+                    ? 24
+                    : 12,
+              },
+              (_, index) => <i key={index} />,
+            )
           )}
         </div>
       )}
@@ -202,6 +235,8 @@ export function PublicProfile({
               </span>
               {sparkles.enabled && (
                 <span class="profile-name-sparkles" aria-hidden="true">
+                  <i />
+                  <i />
                   <i />
                   <i />
                   <i />

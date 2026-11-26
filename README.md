@@ -30,6 +30,8 @@ Two more presets are available to browse. [Graphic](https://sinzbtw.github.io/rv
 
 **Page overlay** includes Glitch with a burst frequency control, Matrix rain with adjustable density, Film dust, and Drifting embers. The effect layer leaves links clickable and respects reduced motion.
 
+Snow, floating particles, name sparkles, and the animated name gradient keep moving while enabled. Film grain adds a fine static texture. Ripple, Particle burst, and click Sparkles fade after each click.
+
 The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
 
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.

@@ -1,6 +1,7 @@
 class ProfilePointer extends HTMLElement {
   #events
   #lastPoint
+  #lastClick = -Infinity
 
   connectedCallback() {
     const profile = this.parentElement
@@ -20,8 +21,15 @@ class ProfilePointer extends HTMLElement {
       'click',
       (event) => {
         const effect = this.dataset.click
-        if (!motion.matches && event.detail && effect !== 'none')
+        if (
+          !motion.matches &&
+          event.detail &&
+          effect !== 'none' &&
+          event.timeStamp - this.#lastClick >= 84
+        ) {
+          this.#lastClick = event.timeStamp
           this.#show(event, effect, profile)
+        }
       },
       { passive: true, signal },
     )
@@ -79,8 +87,25 @@ class ProfilePointer extends HTMLElement {
     if (effect === 'ghost') particle.dataset.cursor = profile.dataset.cursor
     particle.style.left = event.clientX - container.left + 'px'
     particle.style.top = event.clientY - container.top + 'px'
-    particle.addEventListener('animationend', () => particle.remove(), {
-      once: true,
+    if (effect === 'burst' || effect === 'sparkles') {
+      const count = effect === 'burst' ? 8 : 5
+      for (let index = 0; index < count; index++) {
+        const fragment = document.createElement('i')
+        const angle = (index * 2 * Math.PI) / count + (event.timeStamp % 15)
+        const distance = 14 + (index % 3) * 7
+        fragment.style.setProperty(
+          '--mark-x',
+          Math.cos(angle) * distance + 'px',
+        )
+        fragment.style.setProperty(
+          '--mark-y',
+          Math.sin(angle) * distance + 'px',
+        )
+        particle.append(fragment)
+      }
+    }
+    particle.addEventListener('animationend', (event) => {
+      if (event.target === particle) particle.remove()
     })
     if (this.childElementCount >= 20) this.firstElementChild.remove()
     this.append(particle)

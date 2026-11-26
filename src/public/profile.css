@@ -73,13 +73,13 @@
 }
 
 .profile-overlay[data-overlay='grain'] {
-  background:
-    radial-gradient(circle at 1px 1px, currentColor 0.55px, transparent 0.9px) 0
-      0 / 7px 11px,
-    radial-gradient(circle at 2px 2px, currentColor 0.45px, transparent 0.85px)
-      2px 3px / 11px 9px;
+  opacity: calc(var(--overlay-opacity) * 1.8);
+  mix-blend-mode: soft-light;
 }
 
+.profile-grain {
+  display: block;
+}
 .profile-overlay i {
   position: absolute;
   inset-inline-start: var(--drift-x, 3%);
@@ -96,54 +96,93 @@
 .profile-overlay i:nth-child(3n) {
   --flake-size: 8px;
 }
-.profile-overlay i:nth-child(2) {
+.profile-overlay i:nth-child(12n + 2) {
   --drift-x: 11%;
   --drift-y: 71%;
 }
-.profile-overlay i:nth-child(3) {
+.profile-overlay i:nth-child(12n + 3) {
   --drift-x: 24%;
   --drift-y: 46%;
 }
-.profile-overlay i:nth-child(4) {
+.profile-overlay i:nth-child(12n + 4) {
   --drift-x: 29%;
   --drift-y: 84%;
 }
-.profile-overlay i:nth-child(5) {
+.profile-overlay i:nth-child(12n + 5) {
   --drift-x: 36%;
   --drift-y: 24%;
 }
-.profile-overlay i:nth-child(6) {
+.profile-overlay i:nth-child(12n + 6) {
   --drift-x: 46%;
   --drift-y: 56%;
 }
-.profile-overlay i:nth-child(7) {
+.profile-overlay i:nth-child(12n + 7) {
   --drift-x: 52%;
   --drift-y: 88%;
 }
-.profile-overlay i:nth-child(8) {
+.profile-overlay i:nth-child(12n + 8) {
   --drift-x: 60%;
   --drift-y: 9%;
 }
-.profile-overlay i:nth-child(9) {
+.profile-overlay i:nth-child(12n + 9) {
   --drift-x: 70%;
   --drift-y: 72%;
 }
-.profile-overlay i:nth-child(10) {
+.profile-overlay i:nth-child(12n + 10) {
   --drift-x: 79%;
   --drift-y: 42%;
 }
-.profile-overlay i:nth-child(11) {
+.profile-overlay i:nth-child(12n + 11) {
   --drift-x: 86%;
   --drift-y: 81%;
 }
-.profile-overlay i:nth-child(12) {
+.profile-overlay i:nth-child(12n + 12) {
   --drift-x: 92%;
   --drift-y: 28%;
 }
 
+.profile-overlay i:nth-child(n + 13) {
+  margin-inline-start: 4%;
+  margin-block-start: 6%;
+}
+
+.profile-overlay[data-overlay='snow'] i {
+  --fall: 8rem;
+  --sway: 25px;
+  --depth: 0.85;
+  box-shadow: 0 0 0.2em currentColor;
+}
+
+.profile-overlay[data-overlay='snow'] i:nth-child(2n) {
+  --fall: 5rem;
+  --sway: -19px;
+  --depth: 0.55;
+}
+
+.profile-overlay[data-overlay='snow'] i:nth-child(3n) {
+  --fall: 12rem;
+  --sway: -32px;
+  --depth: 0.9;
+}
+
 .profile-overlay[data-overlay='particles'] i {
+  --glide-x: 32px;
+  --glide-y: -62px;
+  background: color-mix(in srgb, currentColor, transparent 45%);
   outline: 1px solid currentColor;
   outline-offset: 2px;
+}
+
+.profile-overlay[data-overlay='particles'] i:nth-child(2n) {
+  --glide-x: -38px;
+  --glide-y: -24px;
+  outline: 0;
+  box-shadow: 0 0 7px currentColor;
+}
+
+.profile-overlay[data-overlay='particles'] i:nth-child(3n) {
+  --glide-x: -22px;
+  --glide-y: 30px;
 }
 
 .profile-overlay:is([data-overlay='matrix'], [data-overlay='glitch']) {
@@ -350,7 +389,7 @@
 }
 
 .profile-name-sparkles i,
-.profile-pointer-mark[data-effect='sparkles'],
+.profile-pointer-mark[data-effect='sparkles'] i,
 .profile-pointer-mark[data-effect='trail-sparkles'] {
   width: 11px;
   height: 11px;
@@ -384,6 +423,18 @@
   height: 7px;
 }
 
+.profile-name-sparkles i:nth-child(4) {
+  inset: auto auto -1px 15%;
+  width: 5px;
+  height: 5px;
+}
+
+.profile-name-sparkles i:nth-child(5) {
+  inset: -6px 22% auto auto;
+  width: 6px;
+  height: 6px;
+}
+
 .profile-name-text[data-name-effect='glow'] {
   text-shadow: 0 0 0.25em color-mix(in srgb, var(--accent) 48%, transparent);
 }
@@ -400,20 +451,70 @@
 .profile-pointer-mark[data-effect='ripple'] {
   border: 2px solid currentColor;
   border-radius: 50%;
+  animation: ripple-release 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-.profile-pointer-mark[data-effect='burst'] {
-  width: 7px;
-  height: 7px;
+.profile-pointer-mark:is([data-effect='burst'], [data-effect='sparkles']) {
+  width: 0;
+  height: 0;
+  animation: particle-group 470ms linear both;
+}
+
+.profile-pointer-mark:is([data-effect='burst'], [data-effect='sparkles']) i {
+  position: absolute;
+  inset: 0 auto auto 0;
+  animation: particle-release 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.profile-pointer-mark[data-effect='burst'] i {
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: currentColor;
-  box-shadow:
-    10px 0,
-    -10px 0,
-    5px 9px,
-    -5px 9px,
-    5px -9px,
-    -5px -9px;
+}
+
+.profile-pointer-mark[data-effect='burst'] i:nth-child(3n) {
+  width: 2px;
+  height: 2px;
+}
+
+.profile-pointer-mark[data-effect='sparkles'] i {
+  animation-duration: 410ms;
+}
+
+.profile-pointer-mark[data-effect='sparkles'] i:nth-child(2n) {
+  width: 7px;
+  height: 7px;
+  animation-delay: 38ms;
+}
+
+@keyframes particle-group {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes particle-release {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--mark-x)), calc(-50% + var(--mark-y)))
+      scale(0.45);
+  }
+}
+
+@keyframes ripple-release {
+  from {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.48);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
 }
 
 .profile-pointer-mark[data-effect='ghost'] {
@@ -485,26 +586,47 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .profile-overlay i {
-    animation: overlay-drift 4.8s linear both;
+  .profile-overlay[data-overlay='snow'] i {
+    animation: overlay-drift 9.6s -5s linear infinite;
   }
   .profile-overlay[data-overlay='particles'] i {
-    animation-name: overlay-float;
+    animation: overlay-float 8s -5.2s ease-in-out infinite;
   }
   .profile-overlay i:nth-child(2n) {
-    animation-delay: -1.7s;
+    animation-duration: 12.2s;
+    animation-delay: -3.7s;
   }
   .profile-overlay i:nth-child(3n) {
-    animation-delay: -0.8s;
+    animation-duration: 7.4s;
+    animation-delay: -1.4s;
+  }
+  .profile-overlay i:nth-child(5n) {
+    animation-delay: -6.8s;
+  }
+  .profile-overlay i:nth-child(n + 13):nth-child(odd) {
+    animation-delay: -6.1s;
+  }
+  .profile-overlay[data-overlay='dust'] i {
+    --glide-x: 14px;
+    --glide-y: -24px;
+    animation-delay: -4.2s;
+  }
+  .profile-overlay[data-overlay='embers'] i {
+    animation-delay: -2.2s;
   }
   .profile-name-sparkles i {
-    animation: sparkle-glimmer 1.45s ease-in-out 3 alternate;
+    animation: sparkle-glimmer 3.2s -0.7s ease-in-out infinite;
   }
-  .profile-name-sparkles i:nth-child(2) {
-    animation-delay: 0.32s;
+  .profile-name-sparkles i:nth-child(2n) {
+    animation-duration: 4.3s;
+    animation-delay: -2.1s;
   }
-  .profile-name-sparkles i:nth-child(3) {
-    animation-delay: 0.55s;
+  .profile-name-sparkles i:nth-child(3n) {
+    animation-duration: 2.8s;
+    animation-delay: -1.7s;
+  }
+  .profile-name-sparkles i:nth-child(5n) {
+    animation-delay: -0.2s;
   }
   .profile-name-text[data-name-effect='gradient'] {
     background: linear-gradient(
@@ -516,7 +638,7 @@
       0 / 240% 100%;
     background-clip: text;
     color: transparent;
-    animation: name-gradient 4.5s ease-in-out both;
+    animation: name-gradient 6.5s ease-in-out infinite alternate;
   }
 }
 
@@ -538,35 +660,56 @@
 }
 
 @keyframes overlay-drift {
-  from {
-    transform: translate(-18px, -54px);
-    opacity: 0.3;
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--sway) * -0.5), -42px);
   }
-  to {
-    transform: translate(24px, 34px);
-    opacity: 1;
+  24% {
+    opacity: var(--depth);
+    transform: translate(0, 0);
+  }
+  67% {
+    opacity: var(--depth);
+    transform: translate(var(--sway), calc(var(--fall) * 0.55));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--sway) * 0.6), var(--fall));
   }
 }
+
 @keyframes overlay-float {
-  from {
-    transform: translate(-15px, 35px) scale(0.9);
-    opacity: 0.44;
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(-10px, 14px) scale(0.75);
   }
-  to {
-    transform: translate(18px, -26px) scale(1.1);
-    opacity: 1;
+  34% {
+    opacity: 0.95;
+    transform: translate(0, 0) scale(1);
+  }
+  82% {
+    opacity: 0.5;
+    transform: translate(var(--glide-x), var(--glide-y)) scale(0.9);
   }
 }
+
 @keyframes sparkle-glimmer {
-  from {
-    opacity: 0.35;
-    transform: scale(0.9);
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.65);
   }
-  to {
+  43% {
     opacity: 1;
     transform: scale(1.12);
   }
+  72% {
+    opacity: 0.53;
+    transform: scale(0.91);
+  }
 }
+
 @keyframes name-gradient {
   from {
     background-position: 100% 50%;

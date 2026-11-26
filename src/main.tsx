@@ -15,7 +15,11 @@ import { newProfile } from './profile/demo'
 import './public/background-motion.js'
 import './public/pointer-effects.js'
 import './editor/editor.css'
-import './public/profile.css'
+import profileCss from './public/profile.css?raw'
+
+const profileStyle = document.createElement('style')
+profileStyle.textContent = profileCss
+document.head.append(profileStyle)
 
 const root = document.getElementById('app')
 if (!root) throw new Error('The Rvnce editor root is missing.')
