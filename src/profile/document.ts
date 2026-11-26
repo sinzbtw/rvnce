@@ -8,8 +8,11 @@ import { accentInk } from './colors'
 import {
   accessoryBytes,
   defaultEffects,
+  defaultTabTitleMotion,
+  parseTabTitleMotion,
   socialIcons,
   type SocialIcon,
+  type TabTitleMotion,
 } from './effects'
 import { hasKeys, isHex, record } from './shape'
 
@@ -47,7 +50,7 @@ export interface IconLink extends LinkFields {
 
 export type LinkBlock = (LinkFields & { type: 'link' }) | IconLink
 
-export const profileVersion = 6
+export const profileVersion = 7
 export const themeVersion = 3
 
 export interface ProfileDocument {
@@ -59,7 +62,11 @@ export interface ProfileDocument {
     language: string
   }
   appearance: Appearance
-  branding: { showMadeWithRvnce: boolean; favicon: string | null }
+  branding: {
+    showMadeWithRvnce: boolean
+    favicon: string | null
+    tabTitle: TabTitleMotion
+  }
   blocks: LinkBlock[]
 }
 
@@ -237,6 +244,7 @@ export function validateProfile(
       value.schemaVersion !== 3 &&
       value.schemaVersion !== 4 &&
       value.schemaVersion !== 5 &&
+      value.schemaVersion !== 6 &&
       value.schemaVersion !== profileVersion)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
@@ -273,13 +281,15 @@ export function validateProfile(
   let parsedAppearance: Appearance
   let showMadeWithRvnce = false
   let favicon: string | null = null
+  let tabTitle = defaultTabTitleMotion()
   if (version >= 3) {
     parsedAppearance = parseAppearance(
       appearance,
       version < 5 ? 'classic' : version === 5 ? 'effects' : 'current',
     )
-    const brandingKeys =
-      version >= 4 ? ['showMadeWithRvnce', 'favicon'] : ['showMadeWithRvnce']
+    const brandingKeys = ['showMadeWithRvnce']
+    if (version >= 4) brandingKeys.push('favicon')
+    if (version >= 7) brandingKeys.push('tabTitle')
     if (
       !hasKeys(value.branding, brandingKeys) ||
       typeof value.branding.showMadeWithRvnce !== 'boolean'
@@ -287,6 +297,7 @@ export function validateProfile(
       throw new Error('The profile branding is invalid.')
     }
     showMadeWithRvnce = value.branding.showMadeWithRvnce
+    if (version >= 7) tabTitle = parseTabTitleMotion(value.branding.tabTitle)
     if (version >= 4 && value.branding.favicon !== null) {
       if (typeof value.branding.favicon !== 'string') {
         throw new Error('The profile branding is invalid.')
@@ -361,7 +372,7 @@ export function validateProfile(
     schemaVersion: profileVersion,
     profile: { name, bio, avatar: profile.avatar, language },
     appearance: parsedAppearance,
-    branding: { showMadeWithRvnce, favicon },
+    branding: { showMadeWithRvnce, favicon, tabTitle },
     blocks: parsedBlocks,
   }
   if (mode === 'publish') {

@@ -140,3 +140,68 @@ class ProfileNameMotion extends HTMLElement {
 }
 
 customElements.define('rvnce-name', ProfileNameMotion)
+
+class ProfileTabTitle extends HTMLElement {
+  #events
+  #timer
+  #original = ''
+  #target
+
+  connectedCallback() {
+    this.#target = this.hasAttribute('data-published')
+      ? document.querySelector('title')
+      : this.querySelector('bdi')
+    this.#original = this.hasAttribute('data-published')
+      ? document.title
+      : (this.#target?.textContent.trim() ?? '')
+    if (!this.#original || !this.#target) return
+    this.#events = new AbortController()
+    const { signal } = this.#events
+    const refresh = () => {
+      this.#restore()
+      if (!reducedTextMotion.matches && !document.hidden) this.#play()
+    }
+    document.addEventListener('visibilitychange', refresh, { signal })
+    reducedTextMotion.addEventListener('change', refresh, { signal })
+    refresh()
+  }
+
+  disconnectedCallback() {
+    this.#events?.abort()
+    this.#restore()
+  }
+
+  #restore() {
+    clearTimeout(this.#timer)
+    if (this.#target) this.#target.textContent = this.#original
+  }
+
+  #play() {
+    const letters = Array.from(
+      graphemeSegmenter.segment(this.#original),
+      ({ segment }) => segment,
+    )
+    const typing = this.dataset.motion === 'typewriter'
+    const delay =
+      (typing ? 145 : 275) - Number(this.dataset.speed) * (typing ? 1.05 : 1.8)
+    const loop = [...letters, ' ', '·', ' ', ...letters]
+    const visible = Math.min(letters.length, 22)
+    let step = 0
+    const advance = () => {
+      if (typing) {
+        step = (step % letters.length) + 1
+        this.#target.textContent = letters.slice(0, step).join('')
+      } else {
+        step = (step + 1) % (letters.length + 3)
+        this.#target.textContent = step
+          ? loop.slice(step, step + visible).join('')
+          : this.#original
+      }
+      const fullTitle = typing ? step === letters.length : step === 0
+      this.#timer = setTimeout(advance, fullTitle ? 1550 : delay)
+    }
+    this.#timer = setTimeout(advance, 650)
+  }
+}
+
+customElements.define('rvnce-tab-title', ProfileTabTitle)

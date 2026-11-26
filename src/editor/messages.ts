@@ -1835,6 +1835,27 @@ export const messages = {
     'Curseur de texte clignotant',
     'Blinkende Schreibmarke',
   ],
+  'Tab title animation': [
+    'Анимация заголовка вкладки',
+    'Animación del título de la pestaña',
+    'Animação do título da aba',
+    'Animation du titre de l’onglet',
+    'Animation des Tabtitels',
+  ],
+  'Tab animation speed': [
+    'Скорость анимации вкладки',
+    'Velocidad de animación de la pestaña',
+    'Velocidade da animação da aba',
+    'Vitesse de l’animation de l’onglet',
+    'Tempo der Tabanimation',
+  ],
+  'Scrolling title': [
+    'Прокрутка заголовка',
+    'Título desplazable',
+    'Título rolante',
+    'Titre défilant',
+    'Laufender Titel',
+  ],
 } satisfies Record<string, Translations>
 
 export type Message = keyof typeof messages

@@ -40,7 +40,12 @@ describe('Rvnce profile documents', () => {
     oldEffects.cursor.preset = 'crosshair'
     const appearance = { ...doc.appearance, effects: oldEffects }
     const profile = parseProfile(
-      JSON.stringify({ ...doc, schemaVersion: 5, appearance }),
+      JSON.stringify({
+        ...doc,
+        schemaVersion: 5,
+        appearance,
+        branding: { showMadeWithRvnce: true, favicon: null },
+      }),
     )
     const theme = parseTheme(
       JSON.stringify({ type: 'rvnce-theme', schemaVersion: 2, appearance }),
@@ -50,6 +55,7 @@ describe('Rvnce profile documents', () => {
       expect(restored.appearance.effects.cursor.preset).toBe('crosshair')
       expect(restored.appearance.effects.nameMotion.preset).toBe('none')
     }
+    expect(profile.branding.tabTitle.preset).toBe('none')
   })
 
   it('round-trips a profile and raster avatar', () => {
@@ -185,6 +191,7 @@ describe('Rvnce profile documents', () => {
           ...doc,
           schemaVersion: 4,
           appearance: legacyAppearance,
+          branding: { showMadeWithRvnce: true, favicon: null },
         }),
       ).appearance.effects,
     ).toEqual(effects)

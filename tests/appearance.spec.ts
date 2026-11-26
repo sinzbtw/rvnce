@@ -492,6 +492,51 @@ test('name motion replays with a stable accessible heading in preview and export
   }
 })
 
+test('tab title motion animates the simulated and real tab independently', async ({
+  page,
+}) => {
+  const title = '👩🏽‍💻 E\u0301lodie'
+  const off = page.getByLabel('Tab title animation', { exact: true })
+  await page.goto('/')
+  await page.getByLabel('Display name').fill(title)
+  await expect(off).toHaveValue('none')
+  await off.selectOption('typewriter')
+  const sample = page.locator('.tab-title-settings bdi')
+  const sampling = { intervals: [25, 40, 60], timeout: 5000 }
+  await expect.poll(() => sample.textContent(), sampling).toBe('👩🏽‍💻')
+  await expect(page).toHaveTitle(/Rvnce/)
+  await page.getByRole('button', { name: 'Show preview' }).click()
+  const tab = page.locator('.preview-bar rvnce-tab-title bdi')
+  await expect.poll(() => tab.textContent(), sampling).toBe('👩🏽‍💻')
+  await off.selectOption('scroll')
+  await expect(page.locator('.preview-bar rvnce-tab-title')).toHaveAttribute(
+    'data-motion',
+    'scroll',
+  )
+  await expect.poll(() => tab.textContent(), sampling).not.toBe(title)
+  await off.selectOption('typewriter')
+  await page.getByLabel('Tab animation speed', { exact: true }).fill('0')
+  const archive = unzipSync(await download(page, 'Download site'))
+  const host = await serveArchive(archive)
+  const published = await page.context().newPage()
+  try {
+    await published.goto(host.url)
+    await expect.poll(() => published.title(), sampling).toBe('👩🏽‍💻')
+    await expect(
+      published.getByRole('heading', { name: title, exact: true }),
+    ).toBeVisible()
+    await published.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(published).toHaveTitle(title)
+    await off.selectOption('none')
+    await expect(page.locator('.preview-bar bdi')).toHaveText(title)
+    const staticArchive = unzipSync(await download(page, 'Download site'))
+    expect(staticArchive['text-motion.js']).toBeUndefined()
+  } finally {
+    await published.close()
+    await host.close()
+  }
+})
+
 test('fits the settings preview to short profiles and scrolls on phones', async ({
   page,
 }) => {

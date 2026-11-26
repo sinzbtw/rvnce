@@ -1,4 +1,5 @@
 import { renderToString } from 'preact-render-to-string'
+import { h } from 'preact'
 import {
   avatarBytes,
   faviconBytes,
@@ -51,7 +52,10 @@ export function siteFiles(
   const motion = media && 'poster' in media
   const { cursor, click, trail } = appearance.effects
   const pointer = click.preset !== 'none' || trail !== 'none'
-  const textMotion = appearance.effects.nameMotion.preset !== 'none'
+  const tabTitle = doc.branding.tabTitle
+  const textMotion =
+    appearance.effects.nameMotion.preset !== 'none' ||
+    tabTitle.preset !== 'none'
   const cursorFile =
     cursor.preset === 'custom' && cursor.image
       ? accessoryBytes(cursor.image, 'cursor')
@@ -111,6 +115,13 @@ export function siteFiles(
         {textMotion && <script src="./text-motion.js" defer />}
       </head>
       <body class="published-page" data-variant={appearance.variant}>
+        {tabTitle.preset !== 'none' &&
+          h('rvnce-tab-title', {
+            hidden: true,
+            'data-published': '',
+            'data-motion': tabTitle.preset,
+            'data-speed': tabTitle.speed,
+          })}
         <main class="published-content profile-viewport">
           <PublicProfile
             doc={doc}

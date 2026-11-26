@@ -26,6 +26,25 @@ export const overlays = [
 export const clicks = ['none', 'ripple', 'burst', 'sparkles'] as const
 export const namePresets = ['glow', 'gradient'] as const
 export const nameMotions = ['none', 'typewriter', 'pulse', 'stagger'] as const
+export const tabTitleMotions = ['none', 'typewriter', 'scroll'] as const
+export interface TabTitleMotion {
+  preset: (typeof tabTitleMotions)[number]
+  speed: number
+}
+
+export function defaultTabTitleMotion(): TabTitleMotion {
+  return { preset: 'none', speed: 50 }
+}
+
+export function parseTabTitleMotion(value: unknown): TabTitleMotion {
+  if (
+    !hasKeys(value, ['preset', 'speed']) ||
+    !includes(tabTitleMotions, value.preset) ||
+    !validSpeed(value.speed)
+  )
+    throw new Error('The profile branding is invalid.')
+  return { preset: value.preset, speed: value.speed }
+}
 export const socialIcons = [
   'auto',
   'website',

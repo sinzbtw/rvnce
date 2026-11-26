@@ -753,6 +753,20 @@ fieldset legend {
   white-space: nowrap;
 }
 
+.preview-tab rvnce-tab-title {
+  display: contents;
+}
+
+.tab-title-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.tab-title-settings .preview-tab {
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px;
+}
+
 .preview-scroll {
   min-height: min(220px, 36dvh);
   max-height: min(480px, 56dvh);

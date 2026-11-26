@@ -11,10 +11,12 @@ import {
   type ProfileDocument,
 } from '../profile/document'
 import { examples } from '../profile/demo'
+import { tabTitleMotions, type TabTitleMotion } from '../profile/effects'
 import { bytesOf } from '../profile/media'
 import { AppearanceEditor } from './Appearance'
 import { IconLinkFields } from './IconLinkFields'
 import { ProfilePreview } from './ProfilePreview'
+import { PreviewTab } from './PreviewTab'
 import { useFloatingPreview } from './floating-preview'
 import { Icon } from './Icon'
 import {
@@ -202,6 +204,17 @@ export function Editor({
   const issues = profileIssues(doc)
   const avatar = doc.profile.avatar ? pngDataUrl(doc.profile.avatar) : null
   const favicon = doc.branding.favicon ? pngDataUrl(doc.branding.favicon) : null
+  const tabTitle = doc.branding.tabTitle
+  const tabText = doc.profile.name.trim() || t('Your name')
+  function changeTabTitle(change: Partial<TabTitleMotion>) {
+    update((current) => ({
+      ...current,
+      branding: {
+        ...current.branding,
+        tabTitle: { ...current.branding.tabTitle, ...change },
+      },
+    }))
+  }
   const media = doc.appearance.background.media
   const exportBytes = media
     ? bytesOf(media.data) + ('poster' in media ? bytesOf(media.poster) : 0)
@@ -936,6 +949,52 @@ export function Editor({
                     {errorCopy(t, faviconFile.error.cause)}
                   </p>
                 )}
+                <div class="tab-title-settings">
+                  <label class="field">
+                    <span class="field-label">{t('Tab title animation')}</span>
+                    <select
+                      aria-label={t('Tab title animation')}
+                      value={tabTitle.preset}
+                      onChange={(event) => {
+                        const preset = tabTitleMotions.find(
+                          (item) => item === event.currentTarget.value,
+                        )
+                        if (preset) changeTabTitle({ preset })
+                      }}
+                    >
+                      <option value="none">{t('None')}</option>
+                      <option value="typewriter">{t('Typewriter')}</option>
+                      <option value="scroll">{t('Scrolling title')}</option>
+                    </select>
+                  </label>
+                  {tabTitle.preset !== 'none' && (
+                    <>
+                      <label class="field">
+                        <span class="field-label">
+                          {t('Tab animation speed')}{' '}
+                          <output aria-hidden="true">{tabTitle.speed}%</output>
+                        </span>
+                        <input
+                          type="range"
+                          aria-label={t('Tab animation speed')}
+                          min={0}
+                          max={100}
+                          value={tabTitle.speed}
+                          onInput={(event) =>
+                            changeTabTitle({
+                              speed: event.currentTarget.valueAsNumber,
+                            })
+                          }
+                        />
+                      </label>
+                      <PreviewTab
+                        title={tabText}
+                        favicon={favicon}
+                        motion={previewShown ? undefined : tabTitle}
+                      />
+                    </>
+                  )}
+                </div>
                 <label class="appearance-check">
                   <input
                     type="checkbox"
@@ -1241,14 +1300,11 @@ export function Editor({
               ref={previewFrame}
             >
               <div class="preview-bar" aria-hidden="true">
-                <span class="preview-tab">
-                  {favicon ? (
-                    <img src={favicon} alt="" width="16" height="16" />
-                  ) : (
-                    <Icon name="file" />
-                  )}
-                  <bdi>{doc.profile.name.trim() || t('Your name')}</bdi>
-                </span>
+                <PreviewTab
+                  title={tabText}
+                  favicon={favicon}
+                  motion={previewShown ? tabTitle : undefined}
+                />
               </div>
               <div
                 class="preview-scroll profile-viewport"

@@ -1,4 +1,5 @@
 import { presetAppearance, type PresetName } from './appearance'
+import { defaultTabTitleMotion } from './effects'
 import {
   profileVersion,
   type LinkBlock,
@@ -10,7 +11,11 @@ export function newProfile(): ProfileDocument {
     schemaVersion: profileVersion,
     profile: { name: '', bio: '', avatar: null, language: 'en' },
     appearance: presetAppearance('minimal'),
-    branding: { showMadeWithRvnce: true, favicon: null },
+    branding: {
+      showMadeWithRvnce: true,
+      favicon: null,
+      tabTitle: defaultTabTitleMotion(),
+    },
     blocks: [],
   }
 }
