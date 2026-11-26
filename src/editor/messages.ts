@@ -1736,6 +1736,42 @@ export const messages = {
     'L’icône du lien doit être un PNG valide.',
     'Das Linksymbol muss eine gültige PNG-Datei sein.',
   ],
+  Glitch: ['Глитч', 'Glitch', 'Glitch', 'Glitch', 'Glitch'],
+  'Matrix rain': [
+    'Матричный дождь',
+    'Lluvia Matrix',
+    'Chuva Matrix',
+    'Pluie Matrix',
+    'Matrix-Regen',
+  ],
+  'Film dust': [
+    'Пыль на плёнке',
+    'Polvo de película',
+    'Poeira de filme',
+    'Poussière de pellicule',
+    'Filmstaub',
+  ],
+  'Drifting embers': [
+    'Летящие угольки',
+    'Brasas flotantes',
+    'Brasas flutuantes',
+    'Braises flottantes',
+    'Treibende Glut',
+  ],
+  'Glitch frequency': [
+    'Частота глитча',
+    'Frecuencia del glitch',
+    'Frequência do glitch',
+    'Fréquence du glitch',
+    'Glitch-Frequenz',
+  ],
+  'Rain density': [
+    'Плотность дождя',
+    'Densidad de la lluvia',
+    'Densidade da chuva',
+    'Densité de la pluie',
+    'Regendichte',
+  ],
 } satisfies Record<string, Translations>
 
 export type Message = keyof typeof messages

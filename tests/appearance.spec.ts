@@ -68,7 +68,11 @@ async function serveArchive(archive: ReturnType<typeof unzipSync>) {
     throw new Error('The archive host did not start.')
   return {
     url: 'http://127.0.0.1:' + address.port + prefix,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.close(() => resolve())
+        server.closeAllConnections()
+      }),
   }
 }
 
@@ -214,6 +218,72 @@ test('effect dialogs preview immediately, restore focus, and match the static ex
   expect(
     await overlay.evaluate((dialog) => dialog.scrollWidth),
   ).toBeLessThanOrEqual(390)
+})
+
+test('new page overlays preview and export on light, dark, and media backgrounds', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Mira Park')
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  const trigger = page.getByRole('button', { name: 'Page overlay' })
+  const dialog = page.getByRole('dialog', { name: 'Page overlay' })
+  test.setTimeout(90_000)
+  for (const surface of ['light', 'dark', 'media']) {
+    if (surface === 'dark')
+      await page.getByRole('radio', { name: 'Dark' }).check()
+    if (surface === 'media') {
+      await page
+        .getByRole('button', { name: 'Background', exact: true })
+        .click()
+      const settings = page.getByRole('dialog', { name: 'Background' })
+      await settings
+        .getByLabel('Background file', { exact: true })
+        .setInputFiles({
+          name: 'backdrop.png',
+          mimeType: 'image/png',
+          buffer: await readFile(photo),
+        })
+      await expect(settings.locator('.profile-backdrop img')).toBeVisible()
+      await settings.getByRole('button', { name: 'Done' }).click()
+    }
+    for (const [preset, animation, selector] of [
+      ['glitch', 'glitch-band', 'span'],
+      ['matrix', 'matrix-fall', '.matrix-stream:not([hidden])'],
+      ['dust', 'overlay-float', 'i'],
+      ['embers', 'ember-rise', 'i'],
+    ] as const) {
+      await trigger.click()
+      await dialog
+        .getByLabel('Overlay preset', { exact: true })
+        .selectOption(preset)
+      const layer = dialog.locator('.profile-overlay')
+      await expect(layer).toHaveCSS('pointer-events', 'none')
+      await expect(layer.locator(selector).first()).toHaveCSS(
+        'animation-name',
+        animation,
+      )
+      if (preset === 'matrix') {
+        await dialog.getByLabel('Rain density', { exact: true }).fill('100')
+        await expect(layer.locator(selector)).toHaveCount(18)
+      }
+      await dialog.getByRole('button', { name: 'Done' }).click()
+      const host = await serveArchive(
+        unzipSync(await download(page, 'Download site')),
+      )
+      const exported = await page.context().newPage()
+      try {
+        await exported.goto(host.url)
+        const marks = exported.locator('.profile-overlay').locator(selector)
+        await expect(marks.first()).toHaveCSS('animation-name', animation)
+        await exported.emulateMedia({ reducedMotion: 'reduce' })
+        await expect(marks.first()).toHaveCSS('animation-name', 'none')
+      } finally {
+        await exported.close()
+        await host.close()
+      }
+    }
+  }
 })
 
 test('fits the settings preview to short profiles and scrolls on phones', async ({

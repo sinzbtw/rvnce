@@ -9,6 +9,15 @@ import { iconForUrl } from '../profile/effects'
 import { imageVariable, profileVariables } from './appearance-css'
 import { SocialIcon } from './SocialIcon'
 
+const rainColumns = [
+  'ヌメ01ネ',
+  '010タロ1',
+  'シ101サ',
+  'ヒ0コ1ミ',
+  'ト01ノ0',
+  'リ1ナ0イ',
+]
+
 export interface ProfileAssets {
   avatarUrl: string | null
   backgroundUrl?: string | undefined
@@ -137,8 +146,36 @@ export function PublicProfile({
           data-overlay={overlay.preset}
           aria-hidden="true"
         >
-          {overlay.preset !== 'grain' &&
-            Array.from({ length: 12 }, (_, index) => <i key={index} />)}
+          {overlay.preset === 'matrix' ? (
+            <div class="matrix-columns">
+              {Array.from({ length: 18 }, (_, index) => (
+                <div
+                  class="matrix-stream"
+                  key={index}
+                  hidden={
+                    (index * 7) % 18 >= Math.ceil(overlay.intensity * 0.18)
+                  }
+                >
+                  {Array.from(
+                    rainColumns[index % rainColumns.length]!,
+                    (glyph, position) => (
+                      <span key={position}>{glyph}</span>
+                    ),
+                  )}
+                  <b>{index % 2 === 0 ? '1' : '0'}</b>
+                </div>
+              ))}
+            </div>
+          ) : overlay.preset === 'glitch' ? (
+            <>
+              <span />
+              <span />
+              <span />
+            </>
+          ) : (
+            overlay.preset !== 'grain' &&
+            Array.from({ length: 12 }, (_, index) => <i key={index} />)
+          )}
         </div>
       )}
       {(click.preset !== 'none' || trail !== 'none') &&

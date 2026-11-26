@@ -146,6 +146,196 @@
   outline-offset: 2px;
 }
 
+.profile-overlay:is([data-overlay='matrix'], [data-overlay='glitch']) {
+  opacity: 0.48;
+}
+
+.matrix-columns {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  direction: ltr;
+}
+
+.profile-overlay[data-overlay='matrix'] {
+  opacity: 0.64;
+}
+
+.matrix-stream {
+  display: grid;
+  grid-row: 1;
+  align-content: start;
+  justify-items: center;
+  gap: 2px;
+  font:
+    600 12px/1 ui-monospace,
+    monospace;
+  color: var(--matrix-ink, var(--overlay-color));
+  visibility: hidden;
+}
+
+.public-profile[data-variant='light'] .matrix-columns {
+  --matrix-ink: color-mix(in srgb, var(--overlay-color) 58%, #16422d);
+}
+
+.matrix-stream[hidden] {
+  display: block;
+}
+
+.matrix-stream span {
+  opacity: 0.68;
+}
+.matrix-stream span:nth-child(1) {
+  opacity: 0.16;
+}
+.matrix-stream span:nth-child(2) {
+  opacity: 0.28;
+}
+.matrix-stream span:nth-child(3) {
+  opacity: 0.42;
+}
+
+.matrix-stream b {
+  color: color-mix(in srgb, currentColor, white 55%);
+  text-shadow: 0 0 5px var(--matrix-ink, var(--overlay-color));
+}
+
+.profile-overlay:is([data-overlay='dust'], [data-overlay='embers']) {
+  opacity: calc(var(--overlay-opacity) * 1.65);
+}
+
+.public-profile[data-variant='light'] .profile-overlay[data-overlay='dust'] {
+  color: color-mix(in srgb, var(--overlay-color) 45%, #51443c);
+}
+
+.profile-overlay[data-overlay='glitch'] span {
+  position: absolute;
+  inset: 24% 5% auto;
+  height: 8px;
+  opacity: 0;
+  background: repeating-linear-gradient(
+    transparent 0 2px,
+    #f281a3 2px 3px,
+    currentColor 3px 4px,
+    #5479c9 4px 5px
+  );
+  clip-path: polygon(
+    0 20%,
+    28% 20%,
+    28% 55%,
+    64% 55%,
+    64% 0,
+    100% 0,
+    100% 80%,
+    0 80%
+  );
+}
+
+.profile-overlay[data-overlay='glitch'] span:nth-child(2) {
+  inset: 55% 24% auto 2%;
+  height: 4px;
+}
+
+.profile-overlay[data-overlay='glitch'] span:nth-child(3) {
+  inset: 77% 8% auto 38%;
+  height: 6px;
+}
+
+.profile-overlay[data-overlay='dust'] i {
+  width: calc(var(--flake-size, 5px) / 2);
+  border-radius: 40% 55% 30% 60%;
+}
+
+.profile-overlay[data-overlay='dust'] i:nth-child(3n) {
+  width: 1px;
+  height: 14px;
+  rotate: -16deg;
+}
+
+.profile-overlay[data-overlay='embers'] i {
+  width: calc(var(--flake-size, 5px) * 0.75);
+  background: color-mix(in srgb, currentColor, white 36%);
+  box-shadow: 0 0 9px 2px currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .matrix-stream:not([hidden]) {
+    visibility: visible;
+    animation: matrix-fall 6.8s -1s linear infinite;
+  }
+  .matrix-stream:nth-child(2n) {
+    animation-delay: -3.6s;
+  }
+  .matrix-stream:nth-child(3n) {
+    animation-duration: 4.7s;
+    animation-delay: -1.8s;
+  }
+  .matrix-stream:nth-child(4n) {
+    font-size: 10px;
+    animation-duration: 8.1s;
+    animation-delay: -4.4s;
+  }
+  .matrix-stream:nth-child(5n) {
+    animation-delay: -6.1s;
+  }
+  .profile-overlay[data-overlay='glitch'] span {
+    animation: glitch-band var(--glitch-period) step-end infinite;
+  }
+  .profile-overlay[data-overlay='glitch'] span:nth-child(2) {
+    animation-delay: -0.06s;
+  }
+  .profile-overlay[data-overlay='glitch'] span:nth-child(3) {
+    animation-delay: -0.12s;
+  }
+  .profile-overlay[data-overlay='dust'] i {
+    animation: overlay-float 9s linear infinite alternate;
+  }
+  .profile-overlay[data-overlay='embers'] i {
+    animation: ember-rise 5.8s linear infinite;
+  }
+}
+
+@keyframes matrix-fall {
+  from {
+    transform: translateY(-7em);
+  }
+  to {
+    transform: translateY(105%);
+  }
+}
+
+@keyframes glitch-band {
+  0%,
+  5%,
+  100% {
+    opacity: 0;
+  }
+  2% {
+    opacity: 0.6;
+    transform: translateX(-5%) scaleX(0.96);
+  }
+  3.4% {
+    opacity: 0.38;
+    transform: translateX(7%) scaleX(1.04);
+  }
+}
+
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-14px, 54px) scale(0.8);
+  }
+  33% {
+    opacity: 1;
+    transform: translate(7px, 5px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(23px, -88px) scale(0.65);
+  }
+}
+
 .profile-name-inline {
   display: inline-block;
   max-width: 100%;

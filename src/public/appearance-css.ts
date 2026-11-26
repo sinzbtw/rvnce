@@ -69,6 +69,7 @@ export function profileVariables(
     '--bio-color': typography.bioColor,
     '--overlay-color': appearance.effects.overlay.color,
     '--overlay-opacity': String(appearance.effects.overlay.intensity / 400),
+    '--glitch-period': 12 - appearance.effects.overlay.intensity * 0.085 + 's',
     '--click-color': appearance.effects.click.color,
     '--sparkle-color': appearance.effects.sparkles.color,
     '--profile-align': typography.align,

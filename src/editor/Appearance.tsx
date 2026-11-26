@@ -20,6 +20,7 @@ import {
   clicks,
   cursors,
   namePresets,
+  overlayDefaults,
   overlays,
   trails,
   type ProfileEffects,
@@ -79,6 +80,10 @@ const optionLabels = {
   snow: 'Snow',
   particles: 'Floating particles',
   grain: 'Film grain',
+  glitch: 'Glitch',
+  matrix: 'Matrix rain',
+  dust: 'Film dust',
+  embers: 'Drifting embers',
   ripple: 'Ripple',
   burst: 'Particle burst',
   glow: 'Glow',
@@ -666,7 +671,7 @@ export function AppearanceEditor({
           value={effects.overlay.preset}
           values={overlays}
           change={(preset) =>
-            setEffect('overlay', (current) => ({ ...current, preset }))
+            setEffect('overlay', () => overlayDefaults(preset))
           }
           reset={() => setEffect('overlay', () => defaults.effects.overlay)}
         />
@@ -680,11 +685,17 @@ export function AppearanceEditor({
               () =>
                 setEffect('overlay', (current) => ({
                   ...current,
-                  color: defaults.effects.overlay.color,
+                  color: overlayDefaults(current.preset).color,
                 })),
             )}
             {range(
-              t('Overlay intensity'),
+              t(
+                effects.overlay.preset === 'glitch'
+                  ? 'Glitch frequency'
+                  : effects.overlay.preset === 'matrix'
+                    ? 'Rain density'
+                    : 'Overlay intensity',
+              ),
               effects.overlay.intensity,
               ranges.percent,
               (intensity) =>
@@ -692,7 +703,7 @@ export function AppearanceEditor({
               () =>
                 setEffect('overlay', (current) => ({
                   ...current,
-                  intensity: defaults.effects.overlay.intensity,
+                  intensity: overlayDefaults(current.preset).intensity,
                 })),
               '%',
             )}

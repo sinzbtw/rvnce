@@ -28,6 +28,8 @@ Two more presets are available to browse. [Graphic](https://sinzbtw.github.io/rv
 
 ![The page overlay settings dialog shows preset, color, and intensity controls next to a preview of the profile](docs/images/appearance-preview.png)
 
+**Page overlay** includes Glitch with a burst frequency control, Matrix rain with adjustable density, Film dust, and Drifting embers. The effect layer leaves links clickable and respects reduced motion.
+
 The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
 
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.

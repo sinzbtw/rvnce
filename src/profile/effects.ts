@@ -4,7 +4,16 @@ import { hasKeys, isHex } from './shape'
 
 export const cursors = ['default', 'cell', 'crosshair', 'custom'] as const
 export const trails = ['none', 'ghost', 'sparkles'] as const
-export const overlays = ['none', 'snow', 'particles', 'grain'] as const
+export const overlays = [
+  'none',
+  'snow',
+  'particles',
+  'grain',
+  'glitch',
+  'matrix',
+  'dust',
+  'embers',
+] as const
 export const clicks = ['none', 'ripple', 'burst', 'sparkles'] as const
 export const namePresets = ['glow', 'gradient'] as const
 export const socialIcons = [
@@ -38,11 +47,27 @@ export interface ProfileEffects {
   name: { enabled: boolean; preset: (typeof namePresets)[number] }
 }
 
+export function overlayDefaults(
+  preset: (typeof overlays)[number],
+): ProfileEffects['overlay'] {
+  const colors = {
+    glitch: '#78e9ff',
+    matrix: '#49f49a',
+    dust: '#f8eedb',
+    embers: '#ff9568',
+  }
+  return {
+    preset,
+    color: preset in colors ? colors[preset as keyof typeof colors] : '#ffffff',
+    intensity: preset === 'glitch' ? 30 : preset === 'matrix' ? 55 : 45,
+  }
+}
+
 export function defaultEffects(accent: string): ProfileEffects {
   return {
     cursor: { preset: 'default', image: null },
     trail: 'none',
-    overlay: { preset: 'none', color: '#ffffff', intensity: 45 },
+    overlay: overlayDefaults('none'),
     click: { preset: 'none', color: accent },
     sparkles: { enabled: false, color: accent },
     name: { enabled: false, preset: 'glow' },
