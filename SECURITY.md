@@ -14,7 +14,7 @@ Rvnce stores one draft in IndexedDB and validates versioned profile and theme JS
 
 Uploaded avatars and still backgrounds have byte and pixel limits and are re-encoded. ZIP export re-encodes the avatar, removing source metadata. GIF and H.264 MP4 backgrounds keep their original bytes, including metadata or embedded audio. Their playback is muted. The editor checks format, dimensions, and size before decoding a supported background.
 
-The standalone HTML includes a content security policy and uses local CSS, fonts, and media. Motion backgrounds allow a local playback script. Site visitors connect to an external destination when they follow a link. The optional Rvnce credit uses a plain link and sends no requests until clicked.
+The standalone HTML includes a content security policy and uses local CSS, media, and built-in or uploaded fonts. An optional HTTPS font URL lets the visitor's browser request the font from its host with CORS and a no-referrer policy. The export adds that origin only to `font-src`. Motion backgrounds and enabled interactive effects use local scripts. Site visitors connect to an external destination when they follow a link. The optional Rvnce credit uses a plain link.
 
 Drafts are stored per browser origin. Anyone with access to that browser profile can read the local draft. Downloaded JSON and ZIP files contain any personal content the author entered.
 

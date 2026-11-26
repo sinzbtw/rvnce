@@ -41,6 +41,7 @@ import {
 } from './preferences'
 import type { StoredDraft } from './storage'
 import { useDraft } from './useDraft'
+import { useCustomFont } from './custom-font'
 
 const sections = ['Profile', 'Links', 'Appearance'] as const
 type Section = (typeof sections)[number]
@@ -132,6 +133,7 @@ export function Editor({
 }) {
   const draft = useDraft(initialDraft, sample)
   const { doc, latest, status, otherDraft } = draft
+  const fontStatus = useCustomFont(doc.appearance.typography.font)
   const [priorAppearance, setPriorAppearance] = useState<Appearance | null>(
     null,
   )
@@ -1180,6 +1182,7 @@ export function Editor({
             )}
             {section === 'Appearance' && (
               <AppearanceEditor
+                fontStatus={fontStatus}
                 appearance={doc.appearance}
                 update={updateAppearance}
                 replace={(edit) => updateAppearance(edit, true)}

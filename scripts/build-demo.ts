@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { fontFiles, siteFiles } from '../src/export/site'
 import { demoProfile, examples } from '../src/profile/demo'
-import { fontNames, type FontName } from '../src/profile/appearance'
+import { fontNames, type FontName } from '../src/profile/fonts'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const dev = process.argv.includes('--dev')
@@ -47,7 +47,10 @@ await Promise.all(
   examples.map(async (example) => {
     const graphic = example.preset === 'graphic'
     const doc = demoProfile(graphic ? avatar.toString('base64') : null, example)
-    const font = fonts.get(doc.appearance.typography.font)!
+    const family = doc.appearance.typography.font
+    if (typeof family !== 'string')
+      throw new Error('The demo needs a built-in font.')
+    const font = fonts.get(family)!
     const files = siteFiles(doc, {
       css,
       favicon,

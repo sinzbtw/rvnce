@@ -36,6 +36,8 @@ Try Pixel arrow, Neon pointer, or Precision reticle in **Cursor and trail**. The
 
 In **Display name effects**, pair Glow or Animated gradient with Typewriter, Soft pulse, or Staggered reveal. Adjust the speed and use **Replay preview** to try it again. The full name stays available to screen readers and appears immediately when reduced motion is enabled.
 
+In **Typography**, pick a bundled sans-serif, serif, monospace, or display font, upload a WOFF2 file up to 1 MiB, or enter a direct HTTPS WOFF2 URL. Uploaded fonts are bundled in the site ZIP. URL fonts are fetched from their host by each visitor and require that host to allow cross-origin font requests. The profile uses a system fallback if the font fails to load or lacks a character.
+
 The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
 
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.
@@ -50,7 +52,7 @@ Rvnce saves one draft per browser origin. If another tab changes the draft, expo
 
 - Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB in any duration. Both motion formats are limited to 1920 × 1080.
 - A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
-- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v7 and theme schema v3. Imported v1–v6 profiles keep their static tab title. Profile v5 and theme v2 retain their saved styles and start with name animation off. Profiles v1–v4 and themes v1 import with the new effects off and their original button links. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
+- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v8 and theme schema v4. Imported v1–v6 profiles keep their static tab title. Profile v5 and theme v2 retain their saved styles and start with name animation off. Profiles v1–v4 and themes v1 import with the new effects off and their original button links. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
 - Cursor and link icon images accept PNG, JPEG, or WebP up to 4 MiB. Rvnce converts them to PNG and fits them within 32 × 32 and 64 × 64 pixels respectively.
 
 ## Run locally
@@ -81,6 +83,6 @@ Rvnce uses Preact, TypeScript, Vite, and Motion for editor animations. The edito
 
 See [Architecture](ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), [Roadmap](ROADMAP.md), and [Security](SECURITY.md).
 
-The source and original Rvnce mark are licensed under [MIT](LICENSE). Motion uses the [MIT license](https://github.com/motiondivision/motion/blob/main/LICENSE.md). Manrope, Source Sans 3, and Source Serif 4 use the SIL Open Font License. Each exported profile includes the selected family's license in `fonts/OFL.txt`.
+The source and original Rvnce mark are licensed under [MIT](LICENSE). Motion uses the [MIT license](https://github.com/motiondivision/motion/blob/main/LICENSE.md). Manrope, Inter, Source Sans 3, Source Serif 4, Roboto Mono, and Oswald use the SIL Open Font License. Exported profiles include the selected bundled family’s license in `fonts/OFL.txt`. Use custom fonts that you have permission to publish.
 
 Editor and generic profile icons come from Lucide. Social logos come from Font Awesome Brands under CC BY 4.0 and use the profile’s link color. Exports include both icon license files in `icons/`. [Lucide license](https://github.com/lucide-icons/lucide/blob/1.79.0/LICENSE) · [Font Awesome Free license](https://fontawesome.com/license/free)

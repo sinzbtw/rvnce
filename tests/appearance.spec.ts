@@ -5,6 +5,10 @@ import { strFromU8, unzipSync } from 'fflate'
 import type { ProfileDocument, ThemeDocument } from '../src/profile/document'
 
 const photo = new URL('../src/assets/mira-park.png', import.meta.url)
+const monoFont = new URL(
+  '../node_modules/@fontsource-variable/roboto-mono/files/roboto-mono-cyrillic-wght-normal.woff2',
+  import.meta.url,
+)
 const files = {
   gif: new URL('./fixtures/background.gif', import.meta.url),
   mp4: new URL('./fixtures/background.mp4', import.meta.url),
@@ -531,6 +535,123 @@ test('tab title motion animates the simulated and real tab independently', async
     await expect(page.locator('.preview-bar bdi')).toHaveText(title)
     const staticArchive = unzipSync(await download(page, 'Download site'))
     expect(staticArchive['text-motion.js']).toBeUndefined()
+  } finally {
+    await published.close()
+    await host.close()
+  }
+})
+
+test('bundles selected font presets and local WOFF2 fonts and restores the draft', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Мира Парк')
+  await page.getByRole('button', { name: 'Show preview' }).click()
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByText('Typography', { exact: true }).click()
+  const font = page.getByLabel('Font', { exact: true })
+  await font.selectOption('roboto-mono')
+  await expect(page.locator('.preview-pane .public-profile')).toHaveCSS(
+    'font-family',
+    /Roboto Mono Variable/,
+  )
+  const builtIn = unzipSync(await download(page, 'Download site'))
+  expect(builtIn['fonts/roboto-mono-cyrillic.woff2']).toBeDefined()
+  expect(strFromU8(builtIn['fonts/OFL.txt']!)).toContain(
+    'SIL OPEN FONT LICENSE',
+  )
+  const picker = page.getByLabel('Custom font file', { exact: true })
+  await picker.setInputFiles({
+    name: 'invalid.woff2',
+    mimeType: 'font/woff2',
+    buffer: Buffer.from('invalid'),
+  })
+  await expect(
+    page.getByText('Choose a valid WOFF2 font up to 1 MiB.'),
+  ).toBeVisible()
+  const data = await readFile(monoFont)
+  await picker.setInputFiles({
+    name: 'custom.woff2',
+    mimeType: 'font/woff2',
+    buffer: data,
+  })
+  await expect(font).toHaveValue('custom-font')
+  await expect(page.getByText('Saved locally', { exact: true })).toBeVisible()
+  await page.reload()
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByText('Typography', { exact: true }).click()
+  await expect(font).toHaveValue('custom-font')
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(Buffer.from(archive['fonts/custom.woff2']!)).toEqual(data)
+  expect(strFromU8(archive['profile.css']!)).toContain(
+    'url("./fonts/custom.woff2")',
+  )
+})
+
+test('loads direct HTTPS fonts in preview and export and reports failures', async ({
+  page,
+}) => {
+  const url = 'https://fonts.example.test/personal.woff2'
+  const data = await readFile(monoFont)
+  const context = page.context()
+  await context.route('https://fonts.example.test/*', (route) =>
+    route.request().url() === url
+      ? route.fulfill({
+          body: data,
+          contentType: 'font/woff2',
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        })
+      : route.fulfill({ status: 404 }),
+  )
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Мира Парк')
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByText('Typography', { exact: true }).click()
+  const input = page.getByRole('textbox', { name: 'Font URL', exact: true })
+  await input.fill(url.replace('personal', 'missing'))
+  await page.getByRole('button', { name: 'Use font URL', exact: true }).click()
+  await expect(
+    page.getByText(
+      'The font URL could not be loaded. Allow cross-origin font requests.',
+    ),
+  ).toBeVisible()
+  await input.fill(url)
+  await input.press('Enter')
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const faces = await document.fonts.load(
+          '400 20px "Rvnce Custom Font"',
+          'Мира',
+        )
+        return faces.some((face) => face.status === 'loaded')
+      }),
+    )
+    .toBe(true)
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(archive['fonts/custom.woff2']).toBeUndefined()
+  expect(strFromU8(archive['profile.css']!)).toContain(url)
+  const host = await serveArchive(archive)
+  const published = await context.newPage()
+  try {
+    const loaded = published.waitForResponse(url)
+    await published.goto(host.url)
+    expect((await loaded).ok()).toBe(true)
+    await expect(published.locator('.public-profile')).toHaveCSS(
+      'font-family',
+      /Rvnce Custom Font/,
+    )
+    await expect
+      .poll(() =>
+        published.evaluate(async () => {
+          const faces = await document.fonts.load(
+            '400 20px "Rvnce Custom Font"',
+            'Мира',
+          )
+          return faces.some((face) => face.status === 'loaded')
+        }),
+      )
+      .toBe(true)
   } finally {
     await published.close()
     await host.close()

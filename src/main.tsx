@@ -1,7 +1,5 @@
 import { render } from 'preact'
-import '@fontsource-variable/manrope'
-import '@fontsource-variable/source-sans-3'
-import '@fontsource-variable/source-serif-4'
+import { previewFontStyles } from './editor/bundled-fonts'
 import { Editor } from './editor/Editor'
 import {
   applyLocale,
@@ -11,16 +9,19 @@ import {
   initialTheme,
 } from './editor/preferences'
 import { readDraft } from './editor/storage'
+import { runtimeAssets } from './editor/runtime-assets'
 import { newProfile } from './profile/demo'
-import './public/background-motion.js'
-import './public/pointer-effects.js'
-import './public/text-motion.js'
 import './editor/editor.css'
 import profileCss from './public/profile.css?raw'
 
 const profileStyle = document.createElement('style')
-profileStyle.textContent = profileCss
+profileStyle.textContent = previewFontStyles() + '\n' + profileCss
 document.head.append(profileStyle)
+for (const url of Object.values(runtimeAssets)) {
+  const script = document.createElement('script')
+  script.src = url
+  document.head.append(script)
+}
 
 const root = document.getElementById('app')
 if (!root) throw new Error('The Rvnce editor root is missing.')

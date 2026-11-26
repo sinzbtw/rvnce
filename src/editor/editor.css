@@ -767,6 +767,21 @@ fieldset legend {
   border-radius: 8px;
 }
 
+.custom-font-settings {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.custom-font-settings .appearance-field {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.custom-font-settings .appearance-field label {
+  flex: 1 1 12rem;
+}
+
 .preview-scroll {
   min-height: min(220px, 36dvh);
   max-height: min(480px, 56dvh);

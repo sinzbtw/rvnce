@@ -1,28 +1,26 @@
 import { strToU8, zip, type Zippable } from 'fflate'
-import manropeCss from '@fontsource-variable/manrope/index.css?raw'
 import manropeLicense from '@fontsource-variable/manrope/LICENSE?raw'
-import sansCss from '@fontsource-variable/source-sans-3/index.css?raw'
+import interLicense from '@fontsource-variable/inter/LICENSE?raw'
+import oswaldLicense from '@fontsource-variable/oswald/LICENSE?raw'
+import monoLicense from '@fontsource-variable/roboto-mono/LICENSE?raw'
 import sansLicense from '@fontsource-variable/source-sans-3/LICENSE?raw'
-import serifCss from '@fontsource-variable/source-serif-4/index.css?raw'
 import serifLicense from '@fontsource-variable/source-serif-4/LICENSE?raw'
 import fontAwesomeLicense from '/node_modules/@fortawesome/free-brands-svg-icons/LICENSE.txt?raw'
 import lucideLicense from '/node_modules/lucide-preact/LICENSE?raw'
 import css from '../public/profile.css?raw'
-import motionScript from '../public/background-motion.js?raw'
-import pointerScript from '../public/pointer-effects.js?raw'
-import textScript from '../public/text-motion.js?raw'
 import { fontFiles, siteFiles } from '../export/site'
+import { bundledFontCss, bundledFontUrl } from './bundled-fonts'
 import type { ProfileDocument } from '../profile/document'
 import { publishedAvatar, publishedFavicon } from './files'
+import { runtimeAssets } from './runtime-assets'
 
-const fontUrls = import.meta.glob<string>(
-  '/node_modules/@fontsource-variable/{manrope,source-sans-3,source-serif-4}/files/*-wght-normal.woff2',
-  { import: 'default', query: '?url&no-inline', eager: true },
-)
-const fontAssets = {
-  manrope: [manropeCss, manropeLicense],
-  'source-sans-3': [sansCss, sansLicense],
-  'source-serif-4': [serifCss, serifLicense],
+const fontLicenses = {
+  manrope: manropeLicense,
+  inter: interLicense,
+  oswald: oswaldLicense,
+  'roboto-mono': monoLicense,
+  'source-sans-3': sansLicense,
+  'source-serif-4': serifLicense,
 } as const
 
 async function asset(
@@ -41,35 +39,40 @@ async function asset(
 
 export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
   const family = doc.appearance.typography.font
-  const [fontCss, fontLicense] = fontAssets[family]
-  const [fonts, avatar, favicon] = await Promise.all([
-    Promise.all(
-      fontFiles(fontCss).map(
-        async (name) =>
-          [
-            name,
-            await asset(
-              fontUrls[
-                '/node_modules/@fontsource-variable/' +
-                  family +
-                  '/files/' +
-                  name
-              ],
-            ),
-          ] as const,
-      ),
-    ),
+  const builtIn = typeof family === 'string' ? family : undefined
+  const fontCss = builtIn ? bundledFontCss[builtIn] : ''
+  const { background, effects } = doc.appearance
+  const [fonts, avatar, favicon, motion, pointer, text] = await Promise.all([
+    builtIn
+      ? Promise.all(
+          fontFiles(fontCss).map(
+            async (name) =>
+              [name, await asset(bundledFontUrl(builtIn, name))] as const,
+          ),
+        )
+      : [],
     doc.profile.avatar ? publishedAvatar(doc.profile.avatar) : undefined,
     doc.branding.favicon ? publishedFavicon(doc.branding.favicon) : undefined,
+    background.media && 'poster' in background.media
+      ? asset(runtimeAssets.background)
+      : undefined,
+    effects.click.preset !== 'none' || effects.trail !== 'none'
+      ? asset(runtimeAssets.pointer)
+      : undefined,
+    effects.nameMotion.preset !== 'none' ||
+    doc.branding.tabTitle.preset !== 'none'
+      ? asset(runtimeAssets.text)
+      : undefined,
   ])
+  const decoder = new TextDecoder()
   const files = siteFiles(doc, {
     css,
-    motionScript,
-    pointerScript,
-    textScript,
+    motionScript: motion && decoder.decode(motion),
+    pointerScript: pointer && decoder.decode(pointer),
+    textScript: text && decoder.decode(text),
     fontCss,
     fonts: Object.fromEntries(fonts),
-    fontLicense: strToU8(fontLicense),
+    fontLicense: builtIn ? strToU8(fontLicenses[builtIn]) : undefined,
     lucideLicense,
     fontAwesomeLicense,
     avatar,

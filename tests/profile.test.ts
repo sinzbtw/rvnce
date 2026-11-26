@@ -32,6 +32,28 @@ const emptyAssets = {
 }
 
 describe('Rvnce profile documents', () => {
+  it('serializes custom font sources safely and limits the export to the configured font host', () => {
+    const doc = demoProfile(null)
+    for (const url of [
+      'http://fonts.example/type.woff2',
+      'https://u:p@fonts.example/type.woff2',
+      'https://fonts.example/a"b.woff2',
+    ]) {
+      doc.appearance.typography.font = { source: 'url', url }
+      expect(() => parseProfile(JSON.stringify(doc))).toThrow(
+        'direct HTTPS font URL',
+      )
+    }
+    const url = 'https://fonts.example/type.woff2?v=1&family=display'
+    doc.appearance.typography.font = { source: 'url', url }
+    const produced = siteFiles(parseProfile(JSON.stringify(doc)), emptyAssets)
+    expect(produced['index.html']).toContain(
+      "font-src 'self' https://fonts.example",
+    )
+    expect(produced['profile.css']).toContain('url("' + url + '")')
+    expect(produced['fonts/custom.woff2']).toBeUndefined()
+  })
+
   it('keeps v5 effects and v2 theme styles when name motion is added', () => {
     const doc = demoProfile(null)
     const { nameMotion, ...oldEffects } = doc.appearance.effects

@@ -4,7 +4,6 @@ import {
   avatarShapes,
   backgroundKinds,
   fits,
-  fontNames,
   hoverStyles,
   linkStyles,
   positions,
@@ -15,6 +14,7 @@ import {
   variants,
   type Appearance,
 } from '../profile/appearance'
+import { fontNames } from '../profile/fonts'
 import { bytesOf } from '../profile/media'
 import {
   clicks,
@@ -29,6 +29,8 @@ import {
 import { contrastRatio } from '../profile/colors'
 import { themeVersion } from '../profile/document'
 import { AccessoryUpload } from './AccessoryUpload'
+import { FontInputs } from './FontInputs'
+import type { FontStatus } from './custom-font'
 import { loadBackground, loadVideoPoster } from './background-files'
 import { download, importTheme } from './files'
 import { Icon } from './Icon'
@@ -39,8 +41,11 @@ type ChangeAppearance = (edit: (value: Appearance) => Appearance) => void
 
 const fontLabels = {
   manrope: 'Manrope',
+  inter: 'Inter',
   'source-sans-3': 'Source Sans 3',
   'source-serif-4': 'Source Serif 4',
+  'roboto-mono': 'Roboto Mono',
+  oswald: 'Oswald',
 }
 const presetLabels = {
   minimal: 'Minimal',
@@ -79,6 +84,7 @@ const optionLabels = {
   neon: 'Neon pointer',
   reticle: 'Precision reticle',
   custom: 'Custom image',
+  'custom-font': 'Custom font',
   ghost: 'Ghost trail',
   sparkles: 'Sparkles',
   snow: 'Snow',
@@ -248,6 +254,7 @@ export function AppearanceEditor({
   undo,
   canUndo,
   renderPreview,
+  fontStatus,
 }: {
   appearance: Appearance
   update: ChangeAppearance
@@ -255,6 +262,7 @@ export function AppearanceEditor({
   undo: () => void
   canUndo: boolean
   renderPreview: (key: number) => ComponentChildren
+  fontStatus: FontStatus
 }) {
   const t = useCopy()
   const { preset, variant, background, typography, card, links, effects } =
@@ -977,10 +985,25 @@ export function AppearanceEditor({
         <div class="appearance-fields">
           <Choice
             label={t('Font')}
-            value={typography.font}
-            values={fontNames}
-            change={(value) => setTypography('font', value)}
+            value={
+              typeof typography.font === 'string'
+                ? typography.font
+                : 'custom-font'
+            }
+            values={
+              typeof typography.font === 'string'
+                ? fontNames
+                : [...fontNames, 'custom-font' as const]
+            }
+            change={(value) => {
+              if (value !== 'custom-font') setTypography('font', value)
+            }}
             reset={() => setTypography('font', defaults.typography.font)}
+          />
+          <FontInputs
+            font={typography.font}
+            status={fontStatus}
+            change={(font) => setTypography('font', font)}
           />
           <Choice
             label={t('Text alignment')}

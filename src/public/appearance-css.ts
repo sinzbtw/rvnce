@@ -1,11 +1,15 @@
 import { accentInk } from '../profile/colors'
-import type { Appearance, FontName } from '../profile/appearance'
+import type { Appearance } from '../profile/appearance'
+import { customFontFamily, type FontName } from '../profile/fonts'
 import { cursorArt } from './cursor-art'
 
 export const fontFamilies: Record<FontName, string> = {
   manrope: 'Manrope Variable',
+  inter: 'Inter Variable',
   'source-sans-3': 'Source Sans 3 Variable',
   'source-serif-4': 'Source Serif 4 Variable',
+  'roboto-mono': 'Roboto Mono Variable',
+  oswald: 'Oswald Variable',
 }
 
 const shadow = {
@@ -26,6 +30,7 @@ export function profileVariables(
   const { accent, avatar, background, card, links, typography } = appearance
   const [cursorX, cursorY] = cursorArt(appearance.effects.cursor.preset)
     ?.anchor ?? [0, 0]
+  const family = typography.font
   const position = background.x + '% ' + background.y + '%'
   const surface =
     background.kind === 'linear'
@@ -60,11 +65,13 @@ export function profileVariables(
     '--media-dim': String(background.dim / 100),
     '--profile-font':
       '"' +
-      fontFamilies[typography.font] +
+      (typeof family === 'string' ? fontFamilies[family] : customFontFamily) +
       '",' +
-      (typography.font === 'source-serif-4'
+      (family === 'source-serif-4'
         ? 'Georgia,serif'
-        : 'system-ui,sans-serif'),
+        : family === 'roboto-mono'
+          ? 'ui-monospace,monospace'
+          : 'system-ui,sans-serif'),
     '--name-size': typography.nameSize / 16 + 'rem',
     '--graphic-name-fluid': (14 * typography.nameSize) / 76 + 'cqi',
     '--name-weight': String(typography.nameWeight),

@@ -1,5 +1,6 @@
 import { validateBackgroundMedia, type BackgroundMedia } from './media'
 import { defaultEffects, parseEffects, type ProfileEffects } from './effects'
+import { parseFont, type ProfileFont } from './fonts'
 import { hasKeys, isHex } from './shape'
 
 export const presetNames = [
@@ -10,7 +11,6 @@ export const presetNames = [
   'graphic',
 ] as const
 export const variants = ['light', 'dark'] as const
-export const fontNames = ['manrope', 'source-sans-3', 'source-serif-4'] as const
 export const positions = ['start', 'center', 'end'] as const
 export const backgroundKinds = ['color', 'linear', 'radial', 'media'] as const
 export const fits = ['cover', 'contain'] as const
@@ -20,7 +20,6 @@ export const hoverStyles = ['none', 'lift', 'slide'] as const
 export const shadows = ['none', 'soft', 'deep'] as const
 export type PresetName = (typeof presetNames)[number]
 export type Variant = (typeof variants)[number]
-export type FontName = (typeof fontNames)[number]
 
 export interface Appearance {
   preset: PresetName
@@ -40,7 +39,7 @@ export interface Appearance {
     media: BackgroundMedia | null
   }
   typography: {
-    font: FontName
+    font: ProfileFont
     nameSize: number
     bioSize: number
     nameWeight: number
@@ -386,7 +385,7 @@ export function parseAppearance(
       media: () => true,
     }) ||
     !group(value.typography, {
-      font: member(fontNames),
+      font: () => true,
       nameSize: integer(...ranges.nameSize),
       bioSize: integer(...ranges.bioSize),
       nameWeight: weight,
@@ -432,6 +431,10 @@ export function parseAppearance(
     throw new Error('Choose a media background before adding a file.')
   return {
     ...appearance,
+    typography: {
+      ...appearance.typography,
+      font: parseFont(appearance.typography.font),
+    },
     effects: legacy
       ? defaultEffects(appearance.accent)
       : parseEffects(value.effects, format === 'effects'),

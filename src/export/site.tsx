@@ -8,15 +8,13 @@ import {
 } from '../profile/document'
 import { backgroundFilename, decodeBase64 } from '../profile/media'
 import { accessoryBytes } from '../profile/effects'
+import { customFontFamily, fontFilePattern, fontSource } from '../profile/fonts'
 import { imageVariable, profileVariables } from '../public/appearance-css'
 import { cursorArt } from '../public/cursor-art'
 import { PublicProfile } from '../public/PublicProfile'
 
 export function fontFiles(stylesheet: string): string[] {
-  return Array.from(
-    stylesheet.matchAll(/url\(\.\/files\/([a-z0-9-]+\.woff2)\)/gu),
-    (match) => match[1]!,
-  )
+  return Array.from(stylesheet.matchAll(fontFilePattern), (match) => match[1]!)
 }
 
 function fontPath(name: string) {
@@ -27,7 +25,7 @@ interface SiteAssets {
   css: string
   fontCss: string
   fonts: Record<string, Uint8Array>
-  fontLicense: Uint8Array
+  fontLicense?: Uint8Array | undefined
   lucideLicense: string
   fontAwesomeLicense: string
   motionScript?: string | undefined
@@ -62,6 +60,9 @@ export function siteFiles(
       : null
   const builtInCursor = cursorArt(cursor.preset)
   const cursorPath = cursorFile ? 'cursor.png' : builtInCursor?.path
+  const font = appearance.typography.font
+  const customFont = typeof font === 'object' ? font : null
+  const remoteFont = customFont?.source === 'url' ? customFont.url : null
   const iconFiles: Record<string, Uint8Array> = {}
   const iconUrls: [string, string][] = []
   const masks: string[] = []
@@ -92,7 +93,7 @@ export function siteFiles(
     "default-src 'none'",
     "style-src 'self'",
     "img-src 'self'",
-    "font-src 'self'",
+    "font-src 'self'" + (remoteFont ? ' ' + new URL(remoteFont).origin : ''),
     "base-uri 'none'",
     "form-action 'none'",
   ]
@@ -138,9 +139,16 @@ export function siteFiles(
   )
   const css = [
     assets.fontCss.replace(
-      /url\(\.\/files\/([a-z0-9-]+\.woff2)\)/gu,
+      fontFilePattern,
       (_, name: string) => 'url(./' + fontPath(name) + ')',
     ),
+    customFont
+      ? '@font-face{font-family:"' +
+        customFontFamily +
+        '";src:' +
+        fontSource(remoteFont ?? './fonts/custom.woff2') +
+        ';font-weight:100 900;font-display:swap}'
+      : '',
     '.published-page{' +
       Object.entries({
         ...profileVariables(appearance),
@@ -165,7 +173,10 @@ export function siteFiles(
         bytes,
       ]),
     ),
-    'fonts/OFL.txt': assets.fontLicense,
+    ...(assets.fontLicense ? { 'fonts/OFL.txt': assets.fontLicense } : {}),
+    ...(customFont?.source === 'file'
+      ? { 'fonts/custom.woff2': decodeBase64(customFont.data) }
+      : {}),
     'icons/Font-Awesome-LICENSE.txt': assets.fontAwesomeLicense,
     'icons/Lucide-LICENSE.txt': assets.lucideLicense,
     ...(avatar ? { 'avatar.png': avatar } : {}),

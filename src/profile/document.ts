@@ -50,8 +50,8 @@ export interface IconLink extends LinkFields {
 
 export type LinkBlock = (LinkFields & { type: 'link' }) | IconLink
 
-export const profileVersion = 7
-export const themeVersion = 3
+export const profileVersion = 8
+export const themeVersion = 4
 
 export interface ProfileDocument {
   schemaVersion: typeof profileVersion
@@ -208,6 +208,7 @@ export function parseTheme(raw: string): ThemeDocument {
     value.type !== 'rvnce-theme' ||
     (value.schemaVersion !== 1 &&
       value.schemaVersion !== 2 &&
+      value.schemaVersion !== 3 &&
       value.schemaVersion !== themeVersion)
   ) {
     throw new Error('Choose a supported Rvnce theme JSON.')
@@ -245,6 +246,7 @@ export function validateProfile(
       value.schemaVersion !== 4 &&
       value.schemaVersion !== 5 &&
       value.schemaVersion !== 6 &&
+      value.schemaVersion !== 7 &&
       value.schemaVersion !== profileVersion)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
