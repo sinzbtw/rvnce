@@ -14,6 +14,7 @@ import { readDraft } from './editor/storage'
 import { newProfile } from './profile/demo'
 import './public/background-motion.js'
 import './public/pointer-effects.js'
+import './public/text-motion.js'
 import './editor/editor.css'
 import profileCss from './public/profile.css?raw'
 

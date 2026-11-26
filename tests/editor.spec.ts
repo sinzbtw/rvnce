@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { crc32 } from 'node:zlib'
 import { unzipSync } from 'fflate'
 import { demoProfile } from '../src/profile/demo'
-import type { ProfileDocument } from '../src/profile/document'
+import { profileVersion, type ProfileDocument } from '../src/profile/document'
 
 const avatarFixture = new URL('../src/assets/mira-park.png', import.meta.url)
 
@@ -77,7 +77,7 @@ test('edits, restores, imports and exports a standalone profile', async ({
     await readFile(jsonPath!, 'utf8'),
   ) as ProfileDocument
   expect(profile.profile.avatar).toBeTruthy()
-  expect(profile.schemaVersion).toBe(5)
+  expect(profile.schemaVersion).toBe(profileVersion)
   expect(profile.branding.favicon).toBeTruthy()
   expect(profile.appearance.accent).toBe('#176451')
 

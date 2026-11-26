@@ -47,8 +47,8 @@ export interface IconLink extends LinkFields {
 
 export type LinkBlock = (LinkFields & { type: 'link' }) | IconLink
 
-export const profileVersion = 5
-export const themeVersion = 2
+export const profileVersion = 6
+export const themeVersion = 3
 
 export interface ProfileDocument {
   schemaVersion: typeof profileVersion
@@ -199,14 +199,23 @@ export function parseTheme(raw: string): ThemeDocument {
   if (
     !hasKeys(value, ['type', 'schemaVersion', 'appearance']) ||
     value.type !== 'rvnce-theme' ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== themeVersion)
+    (value.schemaVersion !== 1 &&
+      value.schemaVersion !== 2 &&
+      value.schemaVersion !== themeVersion)
   ) {
     throw new Error('Choose a supported Rvnce theme JSON.')
   }
   return {
     type: 'rvnce-theme',
     schemaVersion: themeVersion,
-    appearance: parseAppearance(value.appearance, value.schemaVersion === 1),
+    appearance: parseAppearance(
+      value.appearance,
+      value.schemaVersion === 1
+        ? 'classic'
+        : value.schemaVersion === 2
+          ? 'effects'
+          : 'current',
+    ),
   }
 }
 
@@ -227,6 +236,7 @@ export function validateProfile(
       value.schemaVersion !== 2 &&
       value.schemaVersion !== 3 &&
       value.schemaVersion !== 4 &&
+      value.schemaVersion !== 5 &&
       value.schemaVersion !== profileVersion)
   ) {
     throw new Error('This Rvnce profile version is unsupported.')
@@ -264,7 +274,10 @@ export function validateProfile(
   let showMadeWithRvnce = false
   let favicon: string | null = null
   if (version >= 3) {
-    parsedAppearance = parseAppearance(appearance, version < profileVersion)
+    parsedAppearance = parseAppearance(
+      appearance,
+      version < 5 ? 'classic' : version === 5 ? 'effects' : 'current',
+    )
     const brandingKeys =
       version >= 4 ? ['showMadeWithRvnce', 'favicon'] : ['showMadeWithRvnce']
     if (
@@ -304,8 +317,7 @@ export function validateProfile(
 
   const identifiers = new Set<string>()
   const parsedBlocks = blocks.map((block: unknown): LinkBlock => {
-    const icon =
-      version === profileVersion && record(block) && block.type === 'icon'
+    const icon = version >= 5 && record(block) && block.type === 'icon'
     const keys = ['type', 'id', 'label', 'url']
     if (icon) keys.push('icon', 'image', 'tint')
     if (!hasKeys(block, keys)) {

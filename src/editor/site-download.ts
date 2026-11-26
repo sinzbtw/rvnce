@@ -10,6 +10,7 @@ import lucideLicense from '/node_modules/lucide-preact/LICENSE?raw'
 import css from '../public/profile.css?raw'
 import motionScript from '../public/background-motion.js?raw'
 import pointerScript from '../public/pointer-effects.js?raw'
+import textScript from '../public/text-motion.js?raw'
 import { fontFiles, siteFiles } from '../export/site'
 import type { ProfileDocument } from '../profile/document'
 import { publishedAvatar, publishedFavicon } from './files'
@@ -65,6 +66,7 @@ export async function zipProfile(doc: ProfileDocument): Promise<Blob> {
     css,
     motionScript,
     pointerScript,
+    textScript,
     fontCss,
     fonts: Object.fromEntries(fonts),
     fontLicense: strToU8(fontLicense),

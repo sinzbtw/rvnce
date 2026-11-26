@@ -31,6 +31,7 @@ interface SiteAssets {
   fontAwesomeLicense: string
   motionScript?: string | undefined
   pointerScript?: string | undefined
+  textScript?: string | undefined
   avatar?: Uint8Array | undefined
   favicon?: Uint8Array | undefined
 }
@@ -50,6 +51,7 @@ export function siteFiles(
   const motion = media && 'poster' in media
   const { cursor, click, trail } = appearance.effects
   const pointer = click.preset !== 'none' || trail !== 'none'
+  const textMotion = appearance.effects.nameMotion.preset !== 'none'
   const cursorFile =
     cursor.preset === 'custom' && cursor.image
       ? accessoryBytes(cursor.image, 'cursor')
@@ -80,6 +82,8 @@ export function siteFiles(
     throw new Error('The background player could not be loaded.')
   if (pointer && !assets.pointerScript)
     throw new Error('The profile effects could not be loaded.')
+  if (textMotion && !assets.textScript)
+    throw new Error('The profile effects could not be loaded.')
   const csp = [
     "default-src 'none'",
     "style-src 'self'",
@@ -88,7 +92,7 @@ export function siteFiles(
     "base-uri 'none'",
     "form-action 'none'",
   ]
-  if (motion || pointer) csp.push("script-src 'self'")
+  if (motion || pointer || textMotion) csp.push("script-src 'self'")
   if (media?.type === 'video/mp4') csp.push("media-src 'self'")
 
   const html = renderToString(
@@ -104,6 +108,7 @@ export function siteFiles(
         <link rel="stylesheet" href="./profile.css" />
         {motion && <script src="./background-motion.js" defer />}
         {pointer && <script src="./pointer-effects.js" defer />}
+        {textMotion && <script src="./text-motion.js" defer />}
       </head>
       <body class="published-page" data-variant={appearance.variant}>
         <main class="published-content profile-viewport">
@@ -158,6 +163,7 @@ export function siteFiles(
     ...(builtInCursor ? { [builtInCursor.path]: builtInCursor.svg } : {}),
     ...iconFiles,
     ...(pointer ? { 'pointer-effects.js': assets.pointerScript! } : {}),
+    ...(textMotion ? { 'text-motion.js': assets.textScript! } : {}),
     ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),
     ...(motion
       ? {

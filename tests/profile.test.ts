@@ -32,6 +32,26 @@ const emptyAssets = {
 }
 
 describe('Rvnce profile documents', () => {
+  it('keeps v5 effects and v2 theme styles when name motion is added', () => {
+    const doc = demoProfile(null)
+    const { nameMotion, ...oldEffects } = doc.appearance.effects
+    expect(nameMotion.preset).toBe('none')
+    oldEffects.name = { enabled: true, preset: 'gradient' }
+    oldEffects.cursor.preset = 'crosshair'
+    const appearance = { ...doc.appearance, effects: oldEffects }
+    const profile = parseProfile(
+      JSON.stringify({ ...doc, schemaVersion: 5, appearance }),
+    )
+    const theme = parseTheme(
+      JSON.stringify({ type: 'rvnce-theme', schemaVersion: 2, appearance }),
+    )
+    for (const restored of [profile, theme]) {
+      expect(restored.appearance.effects.name).toEqual(oldEffects.name)
+      expect(restored.appearance.effects.cursor.preset).toBe('crosshair')
+      expect(restored.appearance.effects.nameMotion.preset).toBe('none')
+    }
+  })
+
   it('round-trips a profile and raster avatar', () => {
     const doc = demoProfile(samplePng.toString('base64'))
     doc.profile.name = 'Мира Пак'

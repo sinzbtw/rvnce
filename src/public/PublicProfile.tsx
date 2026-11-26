@@ -67,6 +67,7 @@ export function PublicProfile({
     overlay,
     click,
     name: nameEffect,
+    nameMotion,
     sparkles,
   } = appearance.effects
   const buttons = blocks.filter((block) => block.type === 'link')
@@ -77,6 +78,14 @@ export function PublicProfile({
   const name = enteredName || previewLabels?.name || 'Your name'
   const language = profileLanguage(profile.language)
   const previewLocale = previewLabels?.locale
+  const nameText = (
+    <span
+      class="profile-name-text"
+      data-name-effect={nameEffect.enabled ? nameEffect.preset : undefined}
+    >
+      {name}
+    </span>
+  )
 
   return (
     <article
@@ -225,14 +234,23 @@ export function PublicProfile({
             lang={enteredName ? undefined : previewLocale}
           >
             <span class="profile-name-inline">
-              <span
-                class="profile-name-text"
-                data-name-effect={
-                  nameEffect.enabled ? nameEffect.preset : undefined
-                }
-              >
-                {name}
-              </span>
+              {nameMotion.preset === 'none'
+                ? nameText
+                : h(
+                    'rvnce-name',
+                    {
+                      key: JSON.stringify([
+                        name,
+                        nameMotion.preset,
+                        nameMotion.speed,
+                        nameMotion.caret,
+                      ]),
+                      'data-motion': nameMotion.preset,
+                      'data-speed': nameMotion.speed,
+                      'data-caret': String(nameMotion.caret),
+                    },
+                    nameText,
+                  )}
               {sparkles.enabled && (
                 <span class="profile-name-sparkles" aria-hidden="true">
                   <i />

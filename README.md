@@ -34,6 +34,8 @@ Snow, floating particles, name sparkles, and the animated name gradient keep mov
 
 Try Pixel arrow, Neon pointer, or Precision reticle in **Cursor and trail**. The exported site includes the selected cursor artwork, and the editor still accepts custom PNG cursors. Ghost and Sparkles trails fade when the pointer stops.
 
+In **Display name effects**, pair Glow or Animated gradient with Typewriter, Soft pulse, or Staggered reveal. Adjust the speed and use **Replay preview** to try it again. The full name stays available to screen readers and appears immediately when reduced motion is enabled.
+
 The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
 
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.
@@ -46,7 +48,7 @@ Rvnce saves one draft per browser origin. If another tab changes the draft, expo
 
 - Choose a color, linear or radial gradient, PNG, JPEG, WebP, GIF, or H.264 MP4. Photo uploads can be up to 8 MiB and are resized to fit the site. GIFs can be up to 3 MiB and 240 frames. MP4s can be up to 8 MiB in any duration. Both motion formats are limited to 1920 × 1080.
 - A motion background includes a still poster and a stop or play button. The page starts with the poster when the visitor prefers reduced motion or playback is blocked. If the editor cannot open a local MP4, it lets you upload a poster image for it. GIF and MP4 files are included as uploaded, including any metadata or embedded audio. Background video plays muted.
-- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v5 and theme schema v2. Profiles v1–v4 and themes v1 import with the new effects off and their original button links. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
+- Profile and theme JSON files can be up to 16 MiB. Backups use profile schema v6 and theme schema v3. Profile v5 and theme v2 retain their saved styles and start with name animation off. Profiles v1–v4 and themes v1 import with the new effects off and their original button links. Version 1 and 2 profiles keep their Graphic styling and disabled credit, and v1 profiles receive the original default language, `en`.
 - Cursor and link icon images accept PNG, JPEG, or WebP up to 4 MiB. Rvnce converts them to PNG and fits them within 32 × 32 and 64 × 64 pixels respectively.
 
 ## Run locally

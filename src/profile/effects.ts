@@ -25,6 +25,7 @@ export const overlays = [
 ] as const
 export const clicks = ['none', 'ripple', 'burst', 'sparkles'] as const
 export const namePresets = ['glow', 'gradient'] as const
+export const nameMotions = ['none', 'typewriter', 'pulse', 'stagger'] as const
 export const socialIcons = [
   'auto',
   'website',
@@ -54,6 +55,11 @@ export interface ProfileEffects {
   click: { preset: (typeof clicks)[number]; color: string }
   sparkles: { enabled: boolean; color: string }
   name: { enabled: boolean; preset: (typeof namePresets)[number] }
+  nameMotion: {
+    preset: (typeof nameMotions)[number]
+    speed: number
+    caret: boolean
+  }
 }
 
 export function overlayDefaults(
@@ -80,6 +86,7 @@ export function defaultEffects(accent: string): ProfileEffects {
     click: { preset: 'none', color: accent },
     sparkles: { enabled: false, color: accent },
     name: { enabled: false, preset: 'glow' },
+    nameMotion: { preset: 'none', speed: 50, caret: true },
   }
 }
 
@@ -121,10 +128,27 @@ function includes<const T>(values: readonly T[], value: unknown): value is T {
   return values.some((item) => item === value)
 }
 
-export function parseEffects(value: unknown): ProfileEffects {
+export function validSpeed(speed: unknown): speed is number {
+  return (
+    typeof speed === 'number' &&
+    Number.isInteger(speed) &&
+    speed >= 0 &&
+    speed <= 100
+  )
+}
+
+export function parseEffects(value: unknown, legacy = false): ProfileEffects {
   const invalid = 'The profile effects are invalid.'
   if (
-    !hasKeys(value, ['cursor', 'trail', 'overlay', 'click', 'sparkles', 'name'])
+    !hasKeys(value, [
+      'cursor',
+      'trail',
+      'overlay',
+      'click',
+      'sparkles',
+      'name',
+      ...(legacy ? [] : ['nameMotion']),
+    ])
   )
     throw new Error(invalid)
   const { cursor, trail, overlay, click, sparkles, name } = value
@@ -152,7 +176,17 @@ export function parseEffects(value: unknown): ProfileEffects {
   )
     throw new Error(invalid)
   if (cursor.image !== null) accessoryBytes(cursor.image, 'cursor')
-  return value as unknown as ProfileEffects
+  const nameMotion = legacy
+    ? defaultEffects('#ffffff').nameMotion
+    : value.nameMotion
+  if (
+    !hasKeys(nameMotion, ['preset', 'speed', 'caret']) ||
+    !includes(nameMotions, nameMotion.preset) ||
+    !validSpeed(nameMotion.speed) ||
+    typeof nameMotion.caret !== 'boolean'
+  )
+    throw new Error(invalid)
+  return { ...value, nameMotion } as unknown as ProfileEffects
 }
 
 const sites: Record<Exclude<BuiltInIcon, 'website'>, readonly string[]> = {

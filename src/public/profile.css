@@ -394,6 +394,33 @@
   position: relative;
 }
 
+rvnce-name,
+rvnce-name .profile-name-text {
+  display: inline-block;
+  max-width: 100%;
+}
+
+rvnce-name {
+  position: relative;
+}
+
+.profile-name-caret {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 2px;
+  max-height: 1.25em;
+  color: var(--name-color);
+  background: currentColor;
+  pointer-events: none;
+  animation: name-caret 1s step-end infinite;
+}
+
+@keyframes name-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
 .profile-name-sparkles {
   position: absolute;
   inset: -4px 0;

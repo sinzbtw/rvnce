@@ -350,7 +350,11 @@ const radius = integer(...ranges.radius)
 const border = integer(...ranges.border)
 const weight = integer(...ranges.weight)
 
-export function parseAppearance(value: unknown, legacy = false): Appearance {
+export function parseAppearance(
+  value: unknown,
+  format: 'classic' | 'effects' | 'current' = 'current',
+): Appearance {
+  const legacy = format === 'classic'
   if (
     !hasKeys(value, [
       'preset',
@@ -430,6 +434,6 @@ export function parseAppearance(value: unknown, legacy = false): Appearance {
     ...appearance,
     effects: legacy
       ? defaultEffects(appearance.accent)
-      : parseEffects(value.effects),
+      : parseEffects(value.effects, format === 'effects'),
   }
 }

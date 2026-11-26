@@ -19,6 +19,7 @@ import { bytesOf } from '../profile/media'
 import {
   clicks,
   cursors,
+  nameMotions,
   namePresets,
   overlayDefaults,
   overlays,
@@ -91,6 +92,9 @@ const optionLabels = {
   burst: 'Particle burst',
   glow: 'Glow',
   gradient: 'Animated gradient',
+  typewriter: 'Typewriter',
+  pulse: 'Soft pulse',
+  stagger: 'Staggered reveal',
 } as const satisfies Record<string, Message>
 
 const dialogs = {
@@ -787,6 +791,44 @@ export function AppearanceEditor({
             }))
           }
         />
+        <Choice
+          label={t('Name animation')}
+          value={effects.nameMotion.preset}
+          values={nameMotions}
+          change={(preset) =>
+            setEffect('nameMotion', (current) => ({ ...current, preset }))
+          }
+          reset={() =>
+            setEffect('nameMotion', () => defaults.effects.nameMotion)
+          }
+        />
+        {effects.nameMotion.preset !== 'none' &&
+          range(
+            t('Name animation speed'),
+            effects.nameMotion.speed,
+            ranges.percent,
+            (speed) =>
+              setEffect('nameMotion', (current) => ({ ...current, speed })),
+            () =>
+              setEffect('nameMotion', (current) => ({
+                ...current,
+                speed: defaults.effects.nameMotion.speed,
+              })),
+            '%',
+          )}
+        {effects.nameMotion.preset === 'typewriter' && (
+          <label class="appearance-check">
+            <input
+              type="checkbox"
+              checked={effects.nameMotion.caret}
+              onChange={(event) => {
+                const caret = event.currentTarget.checked
+                setEffect('nameMotion', (current) => ({ ...current, caret }))
+              }}
+            />
+            {t('Blinking caret')}
+          </label>
+        )}
       </div>
     ),
     cursor: (

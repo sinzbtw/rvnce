@@ -431,6 +431,67 @@ test('ships the selected cursor with its hotspot and keeps link affordances', as
   }
 })
 
+test('name motion replays with a stable accessible heading in preview and export', async ({
+  page,
+}) => {
+  const name = 'E\u0301lodie 👩🏽‍💻 Семёнова'
+  await page.goto('/')
+  await page.getByLabel('Display name').fill(name)
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByRole('button', { name: 'Display name effects' }).click()
+  const settings = page.getByRole('dialog', { name: 'Display name effects' })
+  const heading = settings.getByRole('heading', { name, exact: true })
+  await settings.getByLabel('Style the name text').check()
+  await settings
+    .getByLabel('Name effect preset', { exact: true })
+    .selectOption('gradient')
+  const motion = settings.getByLabel('Name animation', { exact: true })
+  await motion.selectOption('typewriter')
+  await settings.getByLabel('Name animation speed', { exact: true }).fill('0')
+  await expect(settings.locator('.profile-name-caret')).toBeVisible()
+  const width = (await heading.boundingBox())?.width
+  const replay = settings.getByRole('button', { name: 'Replay preview' })
+  await motion.selectOption('stagger')
+  await replay.click()
+  await expect(heading.locator('.profile-name-text')).toHaveCSS(
+    'clip-path',
+    /^path/,
+  )
+  await expect(heading.locator('.profile-name-text')).toHaveCSS(
+    'clip-path',
+    'none',
+  )
+  expect((await heading.boundingBox())?.width).toBe(width)
+  await motion.selectOption('pulse')
+  await expect
+    .poll(() =>
+      heading
+        .locator('.profile-name-text')
+        .evaluate((text) => text.getAnimations().length),
+    )
+    .toBeGreaterThan(1)
+  await motion.selectOption('typewriter')
+  await settings.getByRole('button', { name: 'Done' }).click()
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(archive['text-motion.js']).toBeDefined()
+  const host = await serveArchive(archive)
+  const published = await page.context().newPage()
+  try {
+    await published.goto(host.url)
+    const text = published
+      .getByRole('heading', { name, exact: true })
+      .locator('.profile-name-text')
+    await expect(text).toHaveCSS('clip-path', /^path/)
+    await published.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(text).toHaveCSS('clip-path', 'none')
+    await expect(text).toHaveText(name)
+    await expect(published.locator('.profile-name-caret')).toHaveCount(0)
+  } finally {
+    await published.close()
+    await host.close()
+  }
+})
+
 test('fits the settings preview to short profiles and scrolls on phones', async ({
   page,
 }) => {

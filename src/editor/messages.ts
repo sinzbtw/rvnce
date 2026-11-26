@@ -1793,6 +1793,48 @@ export const messages = {
     'Réticule de précision',
     'Präzisionsfadenkreuz',
   ],
+  Typewriter: [
+    'Печатная машинка',
+    'Máquina de escribir',
+    'Máquina de escrever',
+    'Machine à écrire',
+    'Schreibmaschine',
+  ],
+  'Soft pulse': [
+    'Мягкая пульсация',
+    'Pulso suave',
+    'Pulso suave',
+    'Pulsation douce',
+    'Sanftes Pulsieren',
+  ],
+  'Staggered reveal': [
+    'Появление по буквам',
+    'Aparición escalonada',
+    'Revelação em sequência',
+    'Apparition échelonnée',
+    'Gestaffelte Einblendung',
+  ],
+  'Name animation': [
+    'Анимация имени',
+    'Animación del nombre',
+    'Animação do nome',
+    'Animation du nom',
+    'Namensanimation',
+  ],
+  'Name animation speed': [
+    'Скорость анимации имени',
+    'Velocidad de animación del nombre',
+    'Velocidade da animação do nome',
+    'Vitesse de l’animation du nom',
+    'Tempo der Namensanimation',
+  ],
+  'Blinking caret': [
+    'Мигающий текстовый курсор',
+    'Cursor de texto parpadeante',
+    'Cursor de texto piscante',
+    'Curseur de texte clignotant',
+    'Blinkende Schreibmarke',
+  ],
 } satisfies Record<string, Translations>
 
 export type Message = keyof typeof messages
