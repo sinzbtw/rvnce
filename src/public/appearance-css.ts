@@ -1,5 +1,6 @@
 import { accentInk } from '../profile/colors'
 import type { Appearance, FontName } from '../profile/appearance'
+import { cursorArt } from './cursor-art'
 
 export const fontFamilies: Record<FontName, string> = {
   manrope: 'Manrope Variable',
@@ -23,6 +24,8 @@ export function profileVariables(
   appearance: Appearance,
 ): Record<string, string> {
   const { accent, avatar, background, card, links, typography } = appearance
+  const [cursorX, cursorY] = cursorArt(appearance.effects.cursor.preset)
+    ?.anchor ?? [0, 0]
   const position = background.x + '% ' + background.y + '%'
   const surface =
     background.kind === 'linear'
@@ -43,6 +46,8 @@ export function profileVariables(
           ')'
         : background.color
   return {
+    '--cursor-anchor': cursorX + ' ' + cursorY,
+    '--cursor-ghost-offset': -cursorX + 'px ' + -cursorY + 'px',
     '--accent': accent,
     '--accent-ink': accentInk(accent),
     '--page-bg': background.color,

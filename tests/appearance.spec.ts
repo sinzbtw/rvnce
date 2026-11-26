@@ -23,6 +23,7 @@ async function serveArchive(archive: ReturnType<typeof unzipSync>) {
     css: 'text/css',
     woff2: 'font/woff2',
     png: 'image/png',
+    svg: 'image/svg+xml',
     gif: 'image/gif',
     jpg: 'image/jpeg',
     mp4: 'video/mp4',
@@ -365,6 +366,70 @@ for (const [preset, keyframe] of [
     },
   )
 }
+
+test('ships the selected cursor with its hotspot and keeps link affordances', async ({
+  page,
+  browser,
+}) => {
+  await page.goto('/')
+  await page.getByLabel('Display name').fill('Signal Garden')
+  await page.getByRole('button', { name: 'Appearance' }).click()
+  await page.getByRole('button', { name: 'Cursor and trail' }).click()
+  const settings = page.getByRole('dialog', { name: 'Cursor and trail' })
+  for (const [preset, hotspot] of [
+    ['pixel', '3 2'],
+    ['neon', '3 3'],
+    ['reticle', '12 12'],
+  ]) {
+    await settings
+      .getByLabel('Cursor preset', { exact: true })
+      .selectOption(preset!)
+    await expect(settings.locator('.public-profile')).toHaveCSS(
+      'cursor',
+      new RegExp(hotspot + ', auto'),
+    )
+  }
+  await settings
+    .getByLabel('Cursor trail', { exact: true })
+    .selectOption('sparkles')
+  const sample = settings.locator('.public-profile')
+  await sample.hover({ position: { x: 25, y: 25 } })
+  const bounds = (await sample.boundingBox())!
+  await page.mouse.move(bounds.x + 180, bounds.y + 35)
+  await expect(
+    settings.locator('[data-effect="trail-sparkles"]').first(),
+  ).toBeVisible()
+  await page.mouse.move(0, 0)
+  await expect(settings.locator('[data-effect="trail-sparkles"]')).toHaveCount(
+    0,
+  )
+  await settings.getByRole('button', { name: 'Done' }).click()
+  const archive = unzipSync(await download(page, 'Download site'))
+  expect(archive['cursors/reticle.svg']).toBeDefined()
+  expect(archive['cursors/pixel.svg']).toBeUndefined()
+  const host = await serveArchive(archive)
+  const context = await browser.newContext({ deviceScaleFactor: 2 })
+  try {
+    const published = await context.newPage()
+    await published.goto(host.url)
+    await expect(published.locator('.public-profile')).toHaveCSS(
+      'cursor',
+      /\/cursors\/reticle\.svg"\) 12 12, auto/,
+    )
+    await expect(
+      published.getByRole('heading', { name: 'Signal Garden' }),
+    ).toHaveCSS('cursor', 'text')
+    await expect(
+      published.getByRole('link', { name: 'Made with Rvnce' }),
+    ).toHaveCSS('cursor', 'pointer')
+    await published.emulateMedia({ reducedMotion: 'reduce' })
+    await published.mouse.move(30, 30)
+    await expect(published.locator('.profile-pointer-mark')).toHaveCount(0)
+  } finally {
+    await context.close()
+    await host.close()
+  }
+})
 
 test('fits the settings preview to short profiles and scrolls on phones', async ({
   page,

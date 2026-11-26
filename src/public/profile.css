@@ -51,10 +51,23 @@
   .public-profile[data-cursor='crosshair'] {
     cursor: crosshair;
   }
-  .public-profile[data-cursor='custom'] {
+  .public-profile:is(
+    [data-cursor='custom'],
+    [data-cursor='pixel'],
+    [data-cursor='neon'],
+    [data-cursor='reticle']
+  ) {
     cursor:
-      var(--cursor-image) 0 0,
+      var(--cursor-image) var(--cursor-anchor),
       auto;
+  }
+
+  .public-profile :is(.profile-link, .profile-social-link, button, a) {
+    cursor: pointer;
+  }
+
+  .public-profile :is(.profile-name, .profile-bio) {
+    cursor: text;
   }
 }
 
@@ -445,7 +458,6 @@
   width: 24px;
   height: 24px;
   color: var(--click-color);
-  animation: pointer-release 280ms ease-out both;
 }
 
 .profile-pointer-mark[data-effect='ripple'] {
@@ -530,14 +542,25 @@
     36% 75%,
     12% 95%
   );
-  animation-name: cursor-fade;
+  animation: cursor-fade 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.profile-pointer-mark[data-effect='ghost']:is(
+    [data-cursor='custom'],
+    [data-cursor='pixel'],
+    [data-cursor='neon'],
+    [data-cursor='reticle']
+  ) {
+  width: 24px;
+  height: 24px;
+  background: var(--cursor-image) top left / auto no-repeat;
+  clip-path: none;
+  translate: var(--cursor-ghost-offset);
 }
 
 .profile-pointer-mark[data-effect='ghost'][data-cursor='custom'] {
   width: 32px;
   height: 32px;
-  background: var(--cursor-image) top left / auto no-repeat;
-  clip-path: none;
 }
 
 .profile-pointer-mark[data-effect='ghost'][data-cursor='cell'],
@@ -563,22 +586,36 @@
 
 .profile-pointer-mark[data-effect='trail-sparkles'] {
   color: var(--accent);
+  width: 8px;
+  height: 8px;
+  animation: trail-sparkle 390ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-@keyframes pointer-release {
-  from {
-    opacity: 0.88;
-    transform: translate(-50%, -50%) scale(0.9);
+.profile-pointer-mark[data-effect='trail-sparkles']:nth-child(2n) {
+  width: 5px;
+  height: 5px;
+  rotate: 35deg;
+  animation-duration: 310ms;
+}
+
+@keyframes trail-sparkle {
+  0% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(0.72);
   }
-  to {
+  27% {
+    opacity: 0.86;
+    transform: translate(-50%, -65%) scale(1.1);
+  }
+  100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2.1);
+    transform: translate(-50%, -118%) scale(0.5);
   }
 }
 
 @keyframes cursor-fade {
   from {
-    opacity: 0.42;
+    opacity: 0.52;
   }
   to {
     opacity: 0;

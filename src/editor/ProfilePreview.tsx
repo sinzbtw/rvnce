@@ -1,5 +1,6 @@
 import type { ProfileDocument } from '../profile/document'
 import { PublicProfile } from '../public/PublicProfile'
+import { cursorArt } from '../public/cursor-art'
 import { pngDataUrl } from './files'
 import { type Locale } from './messages'
 import { useCopy } from './preferences'
@@ -17,6 +18,7 @@ export function ProfilePreview({
   const t = useCopy()
   const media = usePreviewMedia(shown ? doc.appearance.background.media : null)
   const cursor = doc.appearance.effects.cursor
+  const art = cursorArt(cursor.preset)
   const iconUrls = Object.fromEntries(
     doc.blocks.flatMap((block) =>
       block.type === 'icon' && block.icon === 'custom' && block.image
@@ -32,7 +34,9 @@ export function ProfilePreview({
         cursorUrl:
           cursor.preset === 'custom' && cursor.image
             ? pngDataUrl(cursor.image)
-            : undefined,
+            : art
+              ? 'data:image/svg+xml,' + encodeURIComponent(art.svg)
+              : undefined,
         iconUrls,
         ...media,
       }}

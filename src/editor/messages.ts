@@ -1772,6 +1772,27 @@ export const messages = {
     'Densité de la pluie',
     'Regendichte',
   ],
+  'Pixel arrow': [
+    'Пиксельная стрелка',
+    'Flecha pixelada',
+    'Seta pixelada',
+    'Flèche pixelisée',
+    'Pixelpfeil',
+  ],
+  'Neon pointer': [
+    'Неоновый указатель',
+    'Puntero de neón',
+    'Ponteiro neon',
+    'Pointeur néon',
+    'Neonzeiger',
+  ],
+  'Precision reticle': [
+    'Точный прицел',
+    'Mira de precisión',
+    'Mira de precisão',
+    'Réticule de précision',
+    'Präzisionsfadenkreuz',
+  ],
 } satisfies Record<string, Translations>
 
 export type Message = keyof typeof messages

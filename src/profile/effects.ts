@@ -2,7 +2,16 @@ import { checkImageSize } from './image-size'
 import { bytesOf, decodeBase64 } from './media'
 import { hasKeys, isHex } from './shape'
 
-export const cursors = ['default', 'cell', 'crosshair', 'custom'] as const
+export const cursors = [
+  'default',
+  'pixel',
+  'neon',
+  'reticle',
+  'cell',
+  'crosshair',
+  'custom',
+] as const
+export type CursorPreset = (typeof cursors)[number]
 export const trails = ['none', 'ghost', 'sparkles'] as const
 export const overlays = [
   'none',

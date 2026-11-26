@@ -8,6 +8,7 @@ import {
 import { backgroundFilename, decodeBase64 } from '../profile/media'
 import { accessoryBytes } from '../profile/effects'
 import { imageVariable, profileVariables } from '../public/appearance-css'
+import { cursorArt } from '../public/cursor-art'
 import { PublicProfile } from '../public/PublicProfile'
 
 export function fontFiles(stylesheet: string): string[] {
@@ -53,6 +54,8 @@ export function siteFiles(
     cursor.preset === 'custom' && cursor.image
       ? accessoryBytes(cursor.image, 'cursor')
       : null
+  const builtInCursor = cursorArt(cursor.preset)
+  const cursorPath = cursorFile ? 'cursor.png' : builtInCursor?.path
   const iconFiles: Record<string, Uint8Array> = {}
   const iconUrls: [string, string][] = []
   const masks: string[] = []
@@ -125,8 +128,8 @@ export function siteFiles(
     '.published-page{' +
       Object.entries({
         ...profileVariables(appearance),
-        ...(cursorFile
-          ? { '--cursor-image': imageVariable('./cursor.png') }
+        ...(cursorPath
+          ? { '--cursor-image': imageVariable('./' + cursorPath) }
           : {}),
       })
         .map(([key, value]) => key + ':' + value)
@@ -152,6 +155,7 @@ export function siteFiles(
     ...(avatar ? { 'avatar.png': avatar } : {}),
     ...(favicon ? { 'favicon.png': favicon } : {}),
     ...(cursorFile ? { 'cursor.png': cursorFile } : {}),
+    ...(builtInCursor ? { [builtInCursor.path]: builtInCursor.svg } : {}),
     ...iconFiles,
     ...(pointer ? { 'pointer-effects.js': assets.pointerScript! } : {}),
     ...(media && filename ? { [filename]: decodeBase64(media.data) } : {}),

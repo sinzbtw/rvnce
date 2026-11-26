@@ -32,6 +32,8 @@ Two more presets are available to browse. [Graphic](https://sinzbtw.github.io/rv
 
 Snow, floating particles, name sparkles, and the animated name gradient keep moving while enabled. Film grain adds a fine static texture. Ripple, Particle burst, and click Sparkles fade after each click.
 
+Try Pixel arrow, Neon pointer, or Precision reticle in **Cursor and trail**. The exported site includes the selected cursor artwork, and the editor still accepts custom PNG cursors. Ghost and Sparkles trails fade when the pointer stops.
+
 The editing form fills the space next to the sidebar when the floating preview is closed. Opening the preview makes room for it beside the form. In settings dialogs, the preview fits the profile content and scrolls when the profile is taller than the available space.
 
 In **Profile**, you can also add a **Browser tab icon** and toggle **Show Made with Rvnce**, which is on for new profiles. A PNG, JPEG, or WebP tab icon is fitted into a 64 × 64 PNG and included in the exported site.
